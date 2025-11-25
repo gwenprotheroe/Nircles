@@ -9,36 +9,27 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- D3.js CDN -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto" rel="stylesheet">
     <style>
-        /* CSS HEX 
-        --vanilla: #fee89f;
-        --jasmine: #fadc7b;
-        --naples-yellow: #ebc863;
-        --dark-goldenrod: #AB8B36;
-        --timberwolf: #d2d2d2;
-        --french-blue: #0078d7;
-        --raisin-black: #272730;
-        */
-        /* Custom styles for the Canvas visualization */
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #062d68;
-            /* Dark yellow background */
+            font-family: 'Roboto', sans-serif;
+            background-color: #C9C4BD;
+        }
+        input[type=checkbox] {
+            accent-color: black;
+        }
+        input[type=range] {
+            accent-color: #ED6631;
         }
         #palette {
-            --vanilla: #fee89f;
-            --jasmine: #fadc7b;
-            --naples-yellow: #ebc863;
-            --dark-goldenrod: #AB8B36;
-            --field-drab: #634D1C;
-            --timberwolf: #d2d2d2;
-            --light-blue: #a6c8e4;
-            --steel-blue: #c1d2e0;
-            --french-blue: #0078d7;
-            --raisin-black: #272730;
+            --Orange: #ED6631 ;
+            --pebble: #E2DDDB;
+            --fossil: #C9C4BD;
+            --fog: #F2EFEC;
+
         }
         text { 
-            font-family: "Helvetica Neue", Helvetica, sans-serif; 
+            font-family: 'Roboto', sans-serif; 
             fill: black;
             stroke: white; 
             stroke-width: 3; 
@@ -51,11 +42,11 @@
         #folderViz {
             /*display: block;
             /* Remove extra space below canvas */
-            background-color: #dddddd;
+            background-color: #F2EFEC;
             /* Background for the canvas */
-            border-radius: rounded-lg;
+            border-radius: rounded-4xl;
             /* rounded-lg */
-            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+            box-shadow: 0 6px 6px 0 rgba(0, 0, 0, 0.1);
             /* shadow-inner */
             cursor: crosshair;
             /* Indicate draggable/zoomable */
@@ -69,11 +60,11 @@
             position: absolute;
             text-align: left;
             padding: 8px;
-            background: #062d68;
+            background: #E2DDDB;
             /* Dark background for tooltip */
-            color: #d2d2d2;
+            color: black;
             /* Light text for tooltip */
-            border: #d2d2d2;
+            border: black;
             border-style: solid;
             border-width: 1px;
             border-radius: 6px;
@@ -82,8 +73,8 @@
             opacity: 0;
             /* Hidden by default */
             transition: opacity 0.2s ease;
-            font-size: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            font-size: 15px;
+            box-shadow: 0 4px 6px #000000;
             max-width: 250px;
             /* Limit tooltip width */
             word-wrap: break-word;
@@ -94,7 +85,7 @@
         .message-box-overlay {
             position: fixed;
             inset: 0;
-            background-color: rgba(107, 114, 128, 0.5);
+            background-color: #C9C4BD;
             /* gray-600 with 50% opacity */
             display: flex;
             align-items: center;
@@ -107,7 +98,7 @@
             padding: 1.5rem;
             border-radius: 0.5rem;
             /* rounded-lg */
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 10px 15px -3px #C9C4BD, 0 4px 6px -2px rgba(0, 0, 0, 0.05);
             /* shadow-xl */
             max-width: 24rem;
             /* max-w-sm */
@@ -135,32 +126,31 @@
     </style>
 </head>
 
-<body class="min-w-screen bg-[#062d68] flex flex-col items-center justify-center p-2">
-    <div class="md:container bg-[#a6c8e4] mx-auto rounded-lg shadow-xl p-2 max-w-screen w-screen flex-auto flex-col">
+<body class="min-w-screen bg-[#C9C4BD] flex flex-col items-center justify-center p-2">
+    <div class="md:container bg-[#E2DDDB] mx-auto rounded-lg shadow-xl p-2 max-w-screen w-screen flex-auto flex-col">
         <!-- Main Row: Controls (25%) and  Visualization (75%)-->
         <div class="grid grid-cols-1 md:grid-cols-6 flex-row-reverse gap-2 mb-2">
             <!-- Column 1: Controls (25% width) -->
-            <div class="col-span-1 md:col-span-1 bg-[#c1d2e0] p-2 rounded-lg shadow-inner md:min-w-0">
+            <div class="col-span-1 md:col-span-1 bg-[#F2EFEC] p-2 rounded-lg shadow-inner md:min-w-0">
                 <h1 class="text-4xl font-extrabold text-center text-gray-800 mb-6">
                     Nircles
                 </h1>
                 <p class="text-gray-600 mb-4">
-                    See your files and folders as nested circles, reveal the structure of
-                    your project
+                    See all of your files and folders as nested circles, reveal the structure of your directories.
                 </p>
                 <h2 class="text-2xl font-bold text-gray-700 mb-4">Controls</h2>
                 <div class="flex flex-wrap justify-between w-full mb-4 gap-2">
                     <input type="file" id="jsonFileLoad" accept=".json" class="hidden">
                     <button id="loadJsonFileButton"
-                        class="bg-[#062d68] hover:bg-[#0078d7]  text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75">
+                        class="bg-[#ED6631] hover:bg-[#000000]  text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-black-500 focus:ring-opacity-75">
                         Load Summary
                     </button>
                     <button id="zoomOutButton"
-                        class="bg-[#062d68] hover:bg-[#0078d7]  text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-75">
+                        class="bg-[#ED6631] hover:bg-[#000000]  text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-black-500 focus:ring-opacity-75">
                         Reset Zoom
                     </button>
                     <button id="goUpButton"
-                        class="bg-[#062d68] hover:bg-[#0078d7]  text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-75">
+                        class="bg-[#ED6631] hover:bg-[#000000]  text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-black-500 focus:ring-opacity-75">
                         Go Up
                     </button>
                 </div> 
@@ -170,18 +160,19 @@
                         Sort By:
                     </label>
                     <select id="sortBy"
-                    class="shadow-sm border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    class="shadow-sm border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-[#ED6631] focus:border-transparent">
                     <option value="size">File size</option>
                     <option value="reverseSize">File Size Reverse</option>
                     <option value="name">File Name</option>
-                    <option value="type">File Type</option>
-                    <option value="date">Last Modified Date</option>
+                    <!-- <option value="type">File Type</option>
+                    <option value="date">Last Modified Date</option> -->
                     </select>
+                    
                     <label class="block text-gray-700 text-sm font-bold mb-2">
                         Search:
                     </label>
                     <input type="text" id="searchInput" placeholder="Search..."
-                    class="flex-grow mb-2 max-w-xs shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    class="flex-grow mb-2 max-w-xs shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-[#ED6631] focus:border-transparent">
                     <p class="text-gray-700 mb-1">
                         <strong>Results:</strong> <span id="searchCount"></span>
                     </p>
@@ -190,18 +181,22 @@
                     </p>
                 </div>
                 
-            <!-- Placeholder for other controls if needed in the future -->
+                <!-- Placeholder for other controls if needed in the future -->
             </div>
-
+            
             <!-- Column 2: Visualization (50% width) -->
-            <div id="visualizationColumn"
-                class="col-span-4 items-center justify-between rounded-lg min-w-full">
+            <div id="visualizationColumn" class="col-span-4 items-center justify-between rounded-lg min-w-full">
                 <canvas id="folderViz" class="aspect-h-1 rounded-lg"></canvas>
-                <div id="breadcrumbs" class="w-full text-left text-sm text-gray-700 mb-2"></div>
+                <p class="text-gray-700 mb-1">
+                <strong>Breadcrumbs:</strong> <span id="breadcrumbs"></span>
+            </p>  
+                    <p class="text-gray-700 mb-1">
+                        <strong>Copyable Path:</strong> <span id="detailPath"></span>
+                    </p>
             </div>
             <!-- Column 3: Controls (25% width) -->
-            <div class="col-span-1 md:col-span-1 bg-[#c1d2e0] p-2 rounded-lg shadow-inner md:min-w-0">
-            <h2 class="text-2xl font-bold text-gray-700 mb-2">Details</h2>
+            <div class="col-span-1 md:col-span-1 bg-[#F2EFEC] p-2 rounded-lg shadow-inner md:min-w-0">
+                <h2 class="text-2xl font-bold text-gray-700 mb-2">Details</h2>
                 <div id="selectedItemDetails" class="text-gray-600">
                     <h3 class="text-xl font-semibold text-gray-800 mb-2">
                         Selected Item:
@@ -239,10 +234,10 @@
                         Colour By:
                     </label>
                     <select id="colorBy"
-                        class="shadow-sm border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                        <option value="fileSize">Size</option>
+                        class="shadow-sm border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-[#ED6631] focus:border-transparent">
                         <option value="depth">Depth</option>
                         <option value="type">File Type</option>
+                        <option value="fileSize">Size</option>
                         <option value="date">Last Modified Date</option>
                     </select>
                 </div>
@@ -252,7 +247,17 @@
                 <div id="dateLegendItems" class="hidden mt-2">
                     <h4 class="font-semibold text-gray-700 mb-2">Last Modified Date</h4>
                     <div class="h-4 w-full rounded-full"
-                        style="background: linear-gradient(to right, #dfebf7, #08306b); /* Blue gradient */">
+                        style="background: linear-gradient(to left, #F2EFEC, #2B2A28); /* Grey gradient */">
+                    </div>
+                    <div class="flex justify-between text-xs mt-1">
+                        <span id="minDateLabel"></span>
+                        <span id="maxDateLabel"></span>
+                    </div>
+                </div>
+                <div id="depthLegendItems" class="hidden mt-2">
+                    <h4 class="font-semibold text-gray-700 mb-2">Depth</h4>
+                    <div class="h-4 w-full rounded-full"
+                        style="background: linear-gradient(to right, #98edfa, #94f787,#f4c576, #f26e6e, #6857eb); /* Rainbow gradient */">
                     </div>
                     <div class="flex justify-between text-xs mt-1">
                         <span id="minDateLabel"></span>
@@ -262,7 +267,7 @@
                 <div id="fileSizeLegendItems" class="hidden mt-2">
                     <h4 class="font-semibold text-gray-700 mb-2">Folder Size</h4>
                     <div class="h-4 w-full rounded-full"
-                        style="background: linear-gradient(to right,rgb(245,245,245), rgb(22,22,22));"></div>
+                        style="background: linear-gradient(to left,rgb(226 ,221 , 219), rgb(0,0,0));"></div>
                     <div class="flex justify-between text-xs mt-1">
                         <span id="minFileSizeLabel">Smallest</span>
                         <span id="maxFileSizeLabel">Largest</span>
@@ -273,33 +278,46 @@
         <!-- Bottom Row: Key -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
             <!-- Column : Key (50% width) -->
-            <div class="col-span-1 bg-[#c1d2e0] p-2 rounded-lg shadow-inner">
-                <h2 class="text-2xl font-bold text-gray-700 mb-4">Guide</h2>
-                <ul class="list-disc list-inside text-gray-600 mb-4">
-                    <li>Larger circles or nested circles in shades of yellow represent folders or directories.</li>
-                    <li>Smaller, innermost circles represent individual files. Colours can be tweaked to suit.</li>
-                </ul>
+            <div class="col-span-1 bg-[#F2EFEC] p-2 rounded-lg shadow-inner">
+                <h2 class="text-2xl font-bold text-gray-700 mb-4">Options</h2>
+                <div class="slidecontainer">
+                        <label for="sortBy" class="block text-gray-700 text-sm font-bold mb-2">
+                            Padding:
+                            <input type="range" min="0" max="3600" value="3600" class="slider" id="paddingFactor">
+                        </label>
+                        <label for="sortBy" class="block text-gray-700 text-sm font-bold mb-2">
+                            Use file size:
+                            <input type="range" min="1" max="100" value="100" class="slider" id="ignoreSize" value="Yes">
+                        </label>
+                        <label for="ignore">100%</label><br>
+                        <label for="hideLabels">
+                            Hide labels
+                        </label>
+                        <input type="checkbox" id="hideLabels" value="Yes">
+                    </div>
                 <button id="exportPngButton"
-                class="bg-[#062d68] hover:bg-[#0078d7] text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75">
+                class="bg-[#ED6631] hover:bg-[#000000] text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-black-500 focus:ring-opacity-75">
                 Export PNG
             </button>
-            </div>
-            <div class="container bg-[#c1d2e0] mx-auto rounded-lg shadow-xl p-2 max-w-7xl w-full flex flex-col">
-                <h2 class="text-2xl font-bold text-gray-700 mb-4">Footer</h2>
-                <p class="text-gray-600 mb-4">
-                    This is a demonstration of alternative folder visualisation techniques. Other examples include branching trees, tree maps, and sunburst diagrams.
-                    These nested circles can be used to represent any arbitrarily complex hierarchy structure.
-                    
-                </p>
-                <p class="text-gray-600 mb-4">    Thanks to https://d3js.org/ and https://www.visualcinnamon.com/ for their foundational input.
-                </p>
-                <p class="text-gray-600 mb-4"> 
-                    Created by Gwen Protheroe 2025. 
-                </p>
-            </div>
+        </div>
+        <div class="container bg-[#F2EFEC] mx-auto rounded-lg shadow-xl p-2 max-w-7xl w-full flex flex-col">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4">Guide</h2>
+            <p class="text-gray-600 mb-4">
+                This is a demonstration of alternative folder visualisation techniques. Other examples include branching trees, tree maps, and sunburst diagrams.
+                These nested circles can be used to represent any arbitrarily complex hierarchy structure.
+                
+            </p>
+            <ul class="list-disc list-inside text-gray-600 mb-4">
+                <li>Larger circles or nested circles represent folders or directories.</li>
+                <li>Smaller, innermost circles represent individual files.</li>
+            </ul>
+            <p class="text-gray-600 mb-4"> 
+                Created by Gwen Protheroe 2025. 
+            </p>
         </div>
     </div>
-    </div>
+</div>
+</div>
 
     <div id="tooltip" class="tooltip"></div>
 
@@ -326,8 +344,12 @@
 
             const colorBySelect = document.getElementById('colorBy');
             const sortBySelect = document.getElementById('sortBy');
+            const paddingFactorslider = document.getElementById('paddingFactor');
+            const ignoreSize = document.getElementById('ignoreSize');
+            const hideLabels = document.getElementById('hideLabels');
             const typeLegendItems = document.getElementById('typeLegendItems');
             const dateLegendItems = document.getElementById('dateLegendItems');
+            const depthLegendItems = document.getElementById('depthLegendItems');
             const fileSizeLegendItems = document.getElementById('fileSizeLegendItems');
             const minDateLabel = document.getElementById('minDateLabel');
             const maxDateLabel = document.getElementById('maxDateLabel');
@@ -357,26 +379,35 @@
             let transform = d3.zoomIdentity;
 
             // Define color scales
-            const fileTypeColorScale = d3.scaleOrdinal(d3.schemeTableau10);
-            const dateColorScale = d3.scaleSequential(d3.interpolateBlues); // Using interpolateRainbow for all hues
-            const fileDepthColorScale = d3.scaleLinear().range(["#98edfa","#f26e6e"]).interpolate(d3.interpolateHslLong); // Shades of black for folder size
-            const fileSizeColorScale = d3.scaleSqrt().range(["rgb(131,107,66)", "rgb(255,215,100)"]); // Shades of yellow for folder depth
+            const fileTypeColorScale = d3.scaleOrdinal(['#ED6631','#1A845C','#2A73D9','#F3BE0A','#E78F89',
+                '#B24D25','#126745','2056A3','#C08F08','#B55C56',
+                '#FBE0D6','#BDE2C7','#CADCF5','#FCEFC2','#FBE7E7',
+                                                        '#F9CFBF','#F7B89F','#F28F68', //shades of orange
+                                                        '#9AD2A9','#76C38B','#53B36D', //shades of green //(d3.schemeTableau10);
+                                                        '#B4CEF1','#94B9EC','#5F96E3', //shades of blue
+                                                        '#F5E3A4','#F9DF8A','#F6CE47', //shades of yellow
+                                                        '#F7DBDB','#F8D5D5','#F4B5B5'    //shades of himalayan salt pink - oh get lost branding people.
+                                                    ]); 
+            const fileSizeColorScale = d3.scalePow().exponent(0.1).range(["#2B2A28","#F2EFEC"]); //d3.scaleSequential(d3.interpolateBlues); // Using interpolateRainbow for all hues
+            // const fileDepthColorScale = d3.scaleLinear().range(['#FBE0D6','#B24D25']); //Shades of orange 
+            const fileDepthColorScale = d3.scaleLinear().range(["#98edfa","#f26e6e"]).interpolate(d3.interpolateHslLong); // Rainbow for folder depth
+            const dateColorScale = d3.scaleSqrt().range(["#000000","#FFFFFF"]); // Shades of black and white for folder depth
 
             // Dummy Data
             const defaultData = {
-  "path": "C:\\Nircles",
-  "name": "Nircles",
+  "path": "C:\\Demo",
+  "name": "Demo",
   "type": "folder",
   "value": "0",
   "children": [
     {
-      "path": "C:\\Nircles\\Files and Folders",
+      "path": "C:\\Demo\\Files and Folders",
       "name": "Files and Folders",
       "type": "folder",
       "value": "0",
       "children": [
         {
-          "path": "C:\\Nircles\\Files and Folders",
+          "path": "C:\\Demo\\Files and Folders",
           "name": "Email.txt",
           "type": "txt",
           "value": 56715,
@@ -384,33 +415,43 @@
           "last_modified_iso": "2025-08-11T00:45:09.982592"
         },
         {
-          "path": "C:\\Nircles\\Files and Folders",
+          "path": "C:\\Demo\\Files and Folders",
           "name": "Very simply",
-          "type": "",
-          "value": 540968,
+          "type": "folder",
+          "value": 0,
+          "last_modified_unix": 1753489154.0142784,
+          "last_modified_iso": "2025-07-26T01:19:14.014278",
+          "children":[
+            {
+          "path": "C:\\Demo\\Files and Folders\\Very simply",
+          "name": "Rick Deckards Blade Runner Blaster.mp4",
+          "type": "mp4",
+          "value": 290968,
           "last_modified_unix": 1753489154.0142784,
           "last_modified_iso": "2025-07-26T01:19:14.014278"
+        }
+          ]
         }
       ],
       "last_modified_unix": 1754869475.4944975,
       "last_modified_iso": "2025-08-11T00:44:35.494498"
     },
     {
-      "path": "C:\\Nircles\\View",
-      "name": "View",
+      "path": "C:\\Demo\\See All",
+      "name": "See All",
       "type": "folder",
       "value": "0",
       "children": [
         {
-          "path": "C:\\Nircles\\View\\Folder 1",
-          "name": "Folder 1",
+          "path": "C:\\Demo\\See All\\Project 1",
+          "name": "Project 1",
           "type": "folder",
           "value": "0",
           "last_modified_unix": 1754869174.2042792,
           "last_modified_iso": "2025-08-11T00:39:34.204279",
           "children": [
             {
-              "path": "C:\\Nircles\\View\\Folder 1",
+              "path": "C:\\Demo\\See All\\Project 1",
               "name": "Data - Copy.json",
               "type": "json",
               "value": 105486,
@@ -418,7 +459,7 @@
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             },
             {
-              "path": "C:\\Nircles\\View\\Folder 1",
+              "path": "C:\\Demo\\See All\\Project 1",
               "name": "Data.json",
               "type": "json",
               "value": 105486,
@@ -426,15 +467,15 @@
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             },
             {
-              "path": "C:\\Nircles\\View\\Folder 1",
-              "name": "Email - Copy.msg",
-              "type": "msg",
+              "path": "C:\\Demo\\See All\\Project 1",
+              "name": "Photo.jpg",
+              "type": "jpg",
               "value": 105486,
               "last_modified_unix": 1754352061.709732,
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             },
             {
-              "path": "C:\\Nircles\\View\\Folder 1",
+              "path": "C:\\Demo\\See All\\Project 1",
               "name": "Email.msg",
               "type": "msg",
               "value": 105486,
@@ -442,23 +483,23 @@
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             },
             {
-              "path": "C:\\Nircles\\View\\Folder 1",
-              "name": "Report - Copy - Copy.txt",
+              "path": "C:\\Demo\\See All\\Project 1",
+              "name": "Report.txt",
               "type": "txt",
               "value": 211468,
               "last_modified_unix": 1754691194.7485082,
               "last_modified_iso": "2025-08-08T23:13:14.748508"
             },
             {
-              "path": "C:\\Nircles\\View\\Folder 1",
-              "name": "Report - Copy.txt",
+              "path": "C:\\Demo\\See All\\Project 1",
+              "name": "Report_2.txt",
               "type": "txt",
               "value": 105486,
               "last_modified_unix": 1754352061.709732,
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             },
             {
-              "path": "C:\\Nircles\\View\\Folder 1",
+              "path": "C:\\Demo\\See All\\Project 1",
               "name": "Report.txt",
               "type": "txt",
               "value": 105486,
@@ -468,23 +509,23 @@
           ]
         },
         {
-          "path": "C:\\Nircles\\View\\Folder 2",
-          "name": "Folder 2",
+          "path": "C:\\Demo\\See All\\Project 2",
+          "name": "Project 2",
           "type": "folder",
           "value": "0",
           "last_modified_unix": 1754687388.2418442,
           "last_modified_iso": "2025-08-08T22:09:48.241844",
           "children": [
             {
-              "path": "C:\\Nircles\\View\\Folder 2",
-              "name": "Data.json",
-              "type": "json",
+              "path": "C:\\Demo\\See All\\Project 2",
+              "name": "Data.jpg",
+              "type": "jpg",
               "value": 105486,
               "last_modified_unix": 1754352061.709732,
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             },
             {
-              "path": "C:\\Nircles\\View\\Folder 2",
+              "path": "C:\\Demo\\See All\\Project 2",
               "name": "Email.msg",
               "type": "msg",
               "value": 105486,
@@ -492,7 +533,7 @@
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             },
             {
-              "path": "C:\\Nircles\\View\\Folder 2",
+              "path": "C:\\Demo\\See All\\Project 2",
               "name": "Report.txt",
               "type": "txt",
               "value": 105486,
@@ -502,31 +543,31 @@
           ]
         },
         {
-          "path": "C:\\Nircles\\View\\Folder 3",
-          "name": "Folder 3",
+          "path": "C:\\Demo\\See All\\Project 3",
+          "name": "Project 3",
           "type": "folder",
           "value": "0",
           "last_modified_unix": 1754687390.5936754,
           "last_modified_iso": "2025-08-08T22:09:50.593675",
           "children": [
             {
-              "path": "C:\\Nircles\\View\\Folder 3",
-              "name": "Data.json",
-              "type": "json",
-              "value": 105486,
+              "path": "C:\\Demo\\See All\\Project 3",
+              "name": "World Domination.doc",
+              "type": "doc",
+              "value": 145486,
               "last_modified_unix": 1754352061.709732,
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             },
             {
-              "path": "C:\\Nircles\\View\\Folder 3",
-              "name": "Email.msg",
+              "path": "C:\\Demo\\See All\\Project 3",
+              "name": "Nircles.msg",
               "type": "msg",
-              "value": 105486,
+              "value": 15486,
               "last_modified_unix": 1754352061.709732,
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             },
             {
-              "path": "C:\\Nircles\\View\\Folder 3",
+              "path": "C:\\Demo\\See All\\Project 3",
               "name": "Report.txt",
               "type": "txt",
               "value": 105486,
@@ -536,10 +577,10 @@
           ]
         },
         {
-          "path": "C:\\Nircles\\View",
+          "path": "C:\\Demo\\See All",
           "name": "New Text Document.txt",
           "type": "txt",
-          "value": 0,
+          "value": 2000,
           "last_modified_unix": 1754869366.4957943,
           "last_modified_iso": "2025-08-11T00:42:46.495794"
         }
@@ -548,29 +589,29 @@
       "last_modified_iso": "2025-08-11T00:42:46.495794"
     },
     {
-      "path": "C:\\Nircles\\Your",
-      "name": "Your",
+      "path": "C:\\Demo\\Of Your",
+      "name": "Of Your",
       "type": "folder",
       "value": "0",
       "children": [
         {
-          "path": "C:\\Nircles\\Your\\Folder 1",
-          "name": "Folder 1",
+          "path": "C:\\Demo\\Of Your\\Alpha",
+          "name": "Alpha",
           "type": "folder",
           "value": "0",
           "last_modified_unix": 1754690947.0562656,
           "last_modified_iso": "2025-08-08T23:09:07.056266",
           "children": [
             {
-              "path": "C:\\Nircles\\Your\\Folder 1",
+              "path": "C:\\Demo\\Of Your\\Alpha",
               "name": "Data.json",
               "type": "json",
-              "value": 105486,
+              "value": 125486,
               "last_modified_unix": 1754352061.709732,
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             },
             {
-              "path": "C:\\Nircles\\Your\\Folder 1",
+              "path": "C:\\Demo\\Of Your\\Alpha",
               "name": "Email.msg",
               "type": "msg",
               "value": 105486,
@@ -578,9 +619,9 @@
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             },
             {
-              "path": "C:\\Nircles\\Your\\Folder 1",
-              "name": "Report.txt",
-              "type": "txt",
+              "path": "C:\\Demo\\Of Your\\Alpha",
+              "name": "Photo.png",
+              "type": "png",
               "value": 105486,
               "last_modified_unix": 1754352061.709732,
               "last_modified_iso": "2025-08-05T01:01:01.709732"
@@ -588,34 +629,34 @@
           ]
         },
         {
-          "path": "C:\\Nircles\\Your\\Folder 2",
-          "name": "Folder 2",
+          "path": "C:\\Demo\\Of Your\\Beta",
+          "name": "Beta",
           "type": "folder",
           "value": "0",
           "last_modified_unix": 1754687428.2360988,
           "last_modified_iso": "2025-08-08T22:10:28.236099",
           "children": [
             {
-              "path": "C:\\Nircles\\Your\\Folder 2",
+              "path": "C:\\Demo\\Of Your\\Beta",
               "name": "Data.json",
               "type": "json",
-              "value": 105486,
+              "value": 55486,
               "last_modified_unix": 1754352061.709732,
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             },
             {
-              "path": "C:\\Nircles\\Your\\Folder 2",
+              "path": "C:\\Demo\\Of Your\\Beta",
               "name": "Email.msg",
               "type": "msg",
-              "value": 105486,
+              "value": 45486,
               "last_modified_unix": 1754352061.709732,
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             },
             {
-              "path": "C:\\Nircles\\Your\\Folder 2",
-              "name": "Report.txt",
-              "type": "txt",
-              "value": 105486,
+              "path": "C:\\Demo\\Of Your\\Beta",
+              "name": "Report.doc",
+              "type": "doc",
+              "value": 35486,
               "last_modified_unix": 1754352061.709732,
               "last_modified_iso": "2025-08-05T01:01:01.709732"
             }
@@ -693,11 +734,29 @@
             // Event listener for sorting criteria change
             sortBySelect.addEventListener('change', function () {
                 processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
+                zoomToNode(currentZoomNode); // Reset zoom to fit the new data
+            });
+            // Event listener for sorting criteria change
+            hideLabels.addEventListener('change', function () {
+                processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
+                zoomToNode(currentZoomNode); // Reset zoom to fit the new data
+            });
+                        
+            // Event listener for padding criteria input
+            paddingFactorslider.addEventListener('input', function () {
+                processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
+                zoomToNode(currentZoomNode); // Reset zoom to fit the new data
+            });
+
+            // Event listener for file size criteria change
+            ignoreSize.addEventListener('input', function () {
+                processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
+                zoomToNode(currentZoomNode); // Reset zoom to fit the new data
             });
 
             // Event listener for Zoom Out button
             zoomOutButton.addEventListener('click', function () {
-                resetZoom();
+                zoomToNode(currentZoomNode);
             });
 
             // Event listener for Go Up button
@@ -728,18 +787,18 @@
             function processAndRenderVisualization(data) {
                 const containerWidth = visualizationColumn.offsetWidth;
                 // Set canvas height relative to window height, capped by container width for square aspect
-                const containerHeight = Math.min(containerWidth, window.innerHeight * 0.8);
+                const containerHeight = Math.min(containerWidth, window.innerHeight*0.9);
 
                 canvas.width = containerWidth;
                 canvas.height = containerHeight;
 
                 const root = d3.hierarchy(data)
-                    .sum(d => d.value ? +d.value : 1)
+                    .sum(d => Math.pow(d.value, ignoreSize.value /100))  //ignoreSize.checked ?  (d.value / d.value) : +d.value)
                     .sort((a, b) => sortItOut(a,b));
 
                 const pack = d3.pack()
                     .size([containerWidth,containerHeight])
-                    .padding(0.3);
+                    .padding(Math.sqrt(paddingFactorslider.value) / 20);  //Original value 0.3
 
                 currentDataNodes = pack(root).descendants();
                 setColorDomains();
@@ -780,7 +839,7 @@
                     //White background if searching for something
                     ctx.beginPath();
                     ctx.arc(canvas.width / 2, canvas.height / 2, canvas.height / 2, 0, 2 * Math.PI);
-                    ctx.fillStyle = "#ffffee";
+                    ctx.fillStyle = "#F2EFEC";
                     ctx.fill();
                 }
                 
@@ -797,12 +856,12 @@
                     let lineWidth = 0.5 / transform.k;
                     
                     if (d === hoveredNode || d === selectedNode || d === currentZoomNode) {
-                        strokeColor = "#ffffff"; // White for active states
+                        strokeColor = "#ED6631"; // Orange for active states
                         lineWidth = 2.5 / transform.k;
                     }
 
                     if (searchTerm !== '' && matchesSearch(d)) {
-                        strokeColor = "#3993d8"; // Blue for search match
+                        strokeColor = "#F28F68"; // Orange tint for search match
                         lineWidth = 3.5 / transform.k;
                     }
 
@@ -834,13 +893,13 @@
                     let lineWidth = 0.5 / transform.k;
 
                     if (d === hoveredNode || d === selectedNode) {
-                        strokeColor = "#ffffff"; // White for active states
+                        strokeColor = "#ED6631"; // Orange for active states
                         lineWidth = 2.5 / transform.k;
                         
                     }
 
                     if (searchTerm !== '' && matchesSearch(d)) {
-                        strokeColor = "#3993d8"; // Blue for search match
+                        strokeColor = "#F28F68";  // Orange tint for search match
                         lineWidth = 3.5 / transform.k;
                     }
 
@@ -863,14 +922,14 @@
             // Text visibility: only show if the node itself is the currentZoomNode,
             // or if its parent is the currentZoomNode, or if no node is zoomed (root view).
             const relSize = 2* d.r * transform.k;
-            const isVisibleInZoom = (currentZoomNode === null && d.depth === 0) || // Show root if not zoomed
-                            (currentZoomNode !== null && d === currentZoomNode) ||// || (d.parent === currentZoomNode)));
-                            ( 1.3 * Math.min(canvas.width,canvas.height) > relSize) && ( relSize > 100); // Visible size range
+            const isVisibleInZoom = (!hideLabels.checked && currentZoomNode === null && d.depth === 0) || // Show root if not zoomed
+                            (!hideLabels.checked && currentZoomNode !== null && d === currentZoomNode) ||// || (d.parent === currentZoomNode)));
+                            !hideLabels.checked && d.parent === currentZoomNode && ( 1.3 * Math.min(canvas.width,canvas.height) > relSize) && ( relSize > 100); // Visible size range
 
             if (isVisibleInZoom) {
                 const text = d.data.name;
                 ctx.globalAlpha = 1.0; // Reset opacity
-                titleFont = "Inter, sans-serif";
+                titleFont = "Roboto, sans-serif";
                 // Dim non-matching nodes if a search term is active
                 if (searchTerm !== '' && !matchesSearch(d)) {
                     ctx.globalAlpha = 0.1; // Reduce opacity
@@ -881,7 +940,7 @@
                 }
                 //Folder Text
                 if (d.children){
-                    var fontSizeTitle = 14 / (transform.k*1.2)
+                    var fontSizeTitle = 18 / (transform.k*1.2)
                     if (d === currentZoomNode){
                         fontSizeTitle = fontSizeTitle *2;
                     }
@@ -890,7 +949,7 @@
                 drawCircularText( ctx, text, fontSizeTitle, titleFont, d.x, d.y, d.r, textangle, 0);//drawCircularText
                 // drawCircularText( ctx, d.data.last_modified_unix, fontSizeTitle, titleFont, d.x, d.y, d.r, -textangle, 0);//drawCircularText
                 } else {
-                    var fontSize = 10 / (transform.k)
+                    var fontSize = 14 / (transform.k)
                     // ctx.fillStyle = 'rgb(25,25,25)'
                     // ctx.textAlign = 'center' // Ensure we draw in exact center
                     // ctx.fillText(text, d.x, d.y);
@@ -913,7 +972,7 @@
                 // kerning:     0 for normal gap between letters. Positive or negative number to expand/compact gap in pixels
 
                 ctx.strokeStyle = 'white';
-                // setup these to match your needs
+                // setup these to match Of Your needs
                 ctx.miterLimit = 2;
                 ctx.lineJoin = 'circle';
                 
@@ -1042,20 +1101,20 @@
             // Function to get color based on selected option
             function getNodeColor(d) {
                 const colorMode = colorBySelect.value;
-                //if (d.children) { // It's a directory (folder)
-                //return fileDepthColorScale(d.depth); // Directories always show gradient
                 //} else { // It's a file
-                    if (colorMode === "type") {
-                        return fileTypeColorScale(d.data.type);
-                    } else if (colorMode === "date") {
-                        return d.data.last_modified_unix ? dateColorScale(d.data.last_modified_unix) : "#cccccc"; // Default grey if no date
-                    } else if (colorMode === "fileSize") {
-                        return fileSizeColorScale(d.value); //Files also show size
-                    } else {
+                if (colorMode === "depth") {
                     return fileDepthColorScale(d.depth); 
-                    }
-                //}
-                return "#ffffff"; // Fallback default color
+                } else if (colorMode === "date") {
+                    return d.data.last_modified_unix ? dateColorScale(d.data.last_modified_unix) : "#cccccc"; // Default grey if no date
+                } else if (colorMode === "fileSize") {
+                    return fileSizeColorScale(d.value); //Files also show size
+                } else {
+                    if (!d.children) { // It's a directory (folder)
+                    return fileTypeColorScale(d.data.type);
+                }
+                return fileSizeColorScale(d.value); // Directories always show gradient
+                }
+                return "#E2DDDB"; // Fallback default color
             }
 
             // Zoom functionality
@@ -1115,7 +1174,7 @@
 
                     if (i < pathNodes.length - 1) {
                         const separator = document.createElement('span');
-                        separator.textContent = '\\';
+                        separator.textContent = '\n';
                         separator.className = 'mx-1 text-gray-400';
                         breadcrumbsDiv.appendChild(separator);
                     }
@@ -1164,13 +1223,15 @@
                 if (foundNode !== hoveredNode) {
                     hoveredNode = foundNode;
                     drawVisualization(); // Redraw to update hover highlight  <br/>Sub-items: ${hoveredNode.children.length}
+                    // <br/>Type: ${hoveredNode.data.type || "Folder"}
+                    // <br/>Full Path: ${hoveredNode.data.path}
+                    // <br/>Size: ${formatBytes(hoveredNode.value)}
+                    // <br/>Last Modified: ${hoveredNode.data.last_modified_iso ? new Date(hoveredNode.data.last_modified_unix * 1000).toLocaleDateString() : "N/A"}`)
 
                     if (hoveredNode) {
                         tooltip.style("opacity", 0.75)
                             .html(`<strong>${hoveredNode.data.name}</strong>
-                            <br/>Type: ${hoveredNode.data.type || "Folder"}
-                            <br/>Size: ${formatBytes(hoveredNode.value)}
-                            <br/>Last Modified: ${hoveredNode.data.last_modified_iso ? new Date(hoveredNode.data.last_modified_unix * 1000).toLocaleDateString() : "N/A"}`)
+                            `)
                             .style("left", (event.pageX + 40) + "px")
                             .style("top", (event.pageY - 28) + "px");
                     } else {
@@ -1219,10 +1280,21 @@
 
                     detailName.textContent = selectedNode.data.name;
                     detailType.textContent = selectedNode.data.type || "Folder";
-                    detailChildren.textContent = selectedNode.data.children.length;
+                    if (selectedNode.data.children){
+                    detailChildren.textContent = selectedNode.data.children.length + " Children";
+                    } else {
+                        detailChildren.textContent = "";
+                    }
                     detailSize.textContent = formatBytes(selectedNode.value);
                     detailLastModified.textContent = selectedNode.data.last_modified_iso ? new Date(selectedNode.data.last_modified_unix * 1000).toLocaleString() : "N/A";
-                    detailPath.textContent = selectedNode.ancestors().map(node => node.data.name).reverse().join('/');
+                    if (selectedNode.data.children){
+                        detailPath.textContent = selectedNode.data.path;
+                    } else {
+                        detailPath.textContent = selectedNode.data.path + "\\" + selectedNode.data.name;
+                    }
+                    
+                    //Breadcrumbs or full path needs updating
+                    drawVisualization(); // Redraw to remove selection highlight
                 } else {
                     // If click occurred outside any node, clear selection and zoom out
                     if (selectedNode) {
@@ -1252,6 +1324,7 @@
                 // Hide all legends initially
                 typeLegendItems.classList.add('hidden');
                 dateLegendItems.classList.add('hidden');
+                depthLegendItems.classList.add('hidden');
                 fileSizeLegendItems.classList.add('hidden');
 
                 if (colorMode === "type") {
@@ -1279,6 +1352,8 @@
                     });
                 } else if (colorMode === "date") {
                     dateLegendItems.classList.remove('hidden');
+                } else if (colorMode === "depth") {
+                    depthLegendItems.classList.remove('hidden');
                 } else if (colorMode === "fileSize") {
                     fileSizeLegendItems.classList.remove('hidden');
                 }
