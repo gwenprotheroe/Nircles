@@ -5,29 +5,328 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nircles</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- D3.js CDN -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto" rel="stylesheet">
     <style>
+        /* CSS Variables (from Tailwind config) */
+        #palette {
+            --Orange: #ED6631;
+            --pebble: #E2DDDB;
+            --fossil: #C9C4BD;
+            --fog: #F2EFEC;
+        }
+        
+        *{
+          margin: 2px;
+          padding: 0px;
+        }
+        
+        /* Base Styles */
         body {
             font-family: 'Roboto', sans-serif;
-            background-color: #C9C4BD;
+            background-color: var(--fossil, #C9C4BD);
+            min-height: 100vh;
+            margin: 0;
+            padding: 8px; /* p-2 */
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* items-center */
+            justify-content: center; /* justify-center */
+            box-sizing: border-box;
+        }
+        
+        .container-wrapper {
+            background-color: var(--pebble, #E2DDDB);
+            margin-left: auto; /* mx-auto */
+            margin-right: auto; /* mx-auto */
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-xl */
+            padding: 0px; 
+            max-width: 100%; /* max-w-screen */
+            width: 100%; /* w-screen */
+            display: flex; /* flex-auto */
+            flex-direction: column; /* flex-col */
+            flex-grow: 1;
+        }
+
+        /* Grid Layout */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr; /* col-span-1 */
+            gap: 8px; /* gap-2 */
+            margin-bottom: 8px; /* mb-2 */
+            flex-direction: column-reverse;
+        }
+        @media (min-width: 768px) { /* md: */
+            .main-grid {
+                grid-template-columns: repeat(6, 1fr); /* md:grid-cols-6 */
+                flex-direction: row-reverse; /* flex-row-reverse */
+            }
+        }
+
+        /* Column Styles */
+        .controls-column, .details-column {
+            grid-column: span 1 / span 1;
+            background-color: var(--fog, #F2EFEC);
+            padding: 4px; 
+            border-radius: 0.5rem; 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        @media (min-width: 768px) {
+            .visualization-column {
+                grid-column: span 4 / span 4;
+                display: flex;            
+                flex-direction: column;
+                justify-content: space-between;
+                align-items: left;
+                border-radius: 0.5rem; 
+                min-width: 100%;
+            }
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 2.25rem; /* text-4xl */
+            font-weight: 800; /* font-extrabold */
+            text-align: center; /* text-center */
+            color: #1f2937; /* text-gray-800 */
+            margin-bottom: 1.5rem; /* mb-6 */
+        }
+        h2 {
+            font-size: 1.5rem; /* text-2xl */
+            font-weight: 700; /* font-bold */
+            color: #374151; /* text-gray-700 */
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        h3 {
+             font-size: 1.25rem; /* text-xl */
+            font-weight: 600; /* font-semibold */
+            color: #1f2937; /* text-gray-800 */
+            margin-bottom: 0.5rem; /* mb-2 */
+        }
+        h4 {
+             font-size: 1rem; /* text-xl */
+            font-weight: 600; /* font-semibold */
+            color: #374151; /* text-gray-700 */
+            margin-bottom: 0.5rem; /* mb-2 */
+        }
+        p {
+            color: #4b5563; /* text-gray-600 */
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        .text-sm {
+            font-size: 0.875rem;
+        }
+        .text-xs {
+            font-size: 0.75rem;
+        }
+        .text-gray-700 {
+            color: #374151;
+        }
+
+        /* Controls Section */
+        .controls-buttons {
+            display: flex;
+            flex-wrap: wrap; /* flex-wrap */
+            justify-content: space-between; /* justify-between */
+            width: 100%; /* w-full */
+            margin-bottom: 1rem; /* mb-4 */
+            gap: 8px; /* gap-2 */
+        }
+        
+        /* Buttons */
+        button {
+            background-color: var(--Orange, #ED6631);
+            color: white; /* text-white */
+            font-weight: 700; /* font-bold */
+            padding: 8px 16px; /* py-2 px-4 */
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06); /* shadow-md */
+            transition: all 0.3s ease-in-out; /* transition duration-300 ease-in-out */
+            border: none;
+        }
+        button:hover {
+            background-color: black; /* hover:bg-[#000000] */
+            transform: scale(1.05); /* transform hover:scale-105 */
+        }
+        button:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5); /* focus:ring-2 focus:ring-black-500 focus:ring-opacity-75 */
+        }
+
+        /* Input/Select Styles */
+        input[type=file] {
+            display: none; /* hidden */
+        }
+        .input-group {
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        .form-label {
+            display: block;
+            color: #374151; /* text-gray-700 */
+            font-size: 0.875rem; /* text-sm */
+            font-weight: 700; /* font-bold */
+            margin-bottom: 0.5rem; /* mb-2 */
+        }
+        select, input[type=text] {
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+            border: 1px solid #d1d5db; /* border */
+            border-radius: 0.5rem; /* rounded-lg */
+            width: 100%; /* w-full */
+            padding: 8px 12px; /* py-2 px-3 */
+            color: #374151; /* text-gray-700 */
+            line-height: 1.25; /* leading-tight */
+            box-sizing: border-box;
+        }
+        select:focus, input[type=text]:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(237, 102, 49, 0.5); /* focus:ring-2 focus:ring-[#ED6631] */
+            border-color: transparent; /* focus:border-transparent */
         }
         input[type=checkbox] {
             accent-color: black;
         }
         input[type=range] {
-            accent-color: #ED6631;
+            accent-color: var(--Orange, #ED6631);
         }
-        #palette {
-            --Orange: #ED6631 ;
-            --pebble: #E2DDDB;
-            --fossil: #C9C4BD;
-            --fog: #F2EFEC;
+        #searchInput {
+            max-width: 100%; /* max-w-xs - adjusted for full column width */
+            margin-bottom: 0.5rem; /* mb-2 */
+            flex-grow: 1; /* flex-grow */
+        }
 
+        /* Visualization Area */
+        #visualizationColumn {
+            grid-column: span 1 / span 1;
+            /* Default to full width on mobile/small screen */
         }
+        @media (min-width: 768px) {
+            #visualizationColumn {
+                grid-column: span 4 / span 4;
+            }
+        }
+        #folderViz {
+            background-color: var(--white, #FFFFFF);
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 6px 6px 0 rgba(0, 0, 0, 0.1);
+            cursor: crosshair;
+            display: block;
+            width: 100%;
+            /* Aspect ratio is handled in JS by calculating height based on width */
+        }
+        #folderViz.grabbing {
+            cursor: grab;
+        }
+
+        /* Details and Search Results */
+        .detail-item, .summary-item {
+            color: #374151; /* text-gray-700 */
+            margin-bottom: 4px; /* mb-1 */
+        }
+        #selectedItemDetails {
+            color: #4b5563; /* text-gray-600 */
+        }
+        #initialDetailsPrompt {
+            color: #4b5563;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        
+        /* Breadcrumbs */
+        .breadcrumb-item {
+            cursor: pointer;
+            color: #0078d7;
+            text-decoration: none;
+            align-items: left;
+            justify-content: left;
+            text-align: left;
+        }
+        .breadcrumb-item:hover {
+            text-decoration: underline;
+        }
+        .breadcrumb-item.current {
+            color: #585858;
+            cursor: default;
+            text-decoration: none;
+        }
+
+        /* Color Legend */
+        #typeLegendItems, #searchItems {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 4px; /* gap-x-2 gap-y-1 */
+            font-size: 0.875rem; /* text-sm */
+        }
+        #typeLegendItems > div, #searchItems > div {
+            display: flex;
+            align-items: center;
+            gap: 8px; /* space-x-2 */
+        }
+        #dateLegendItems, #depthLegendItems, #fileSizeLegendItems {
+            margin-top: 8px; /* mt-2 */
+        }
+        .legend-bar {
+            height: 1rem; /* h-4 */
+            width: 100%; /* w-full */
+            border-radius: 9999px; /* rounded-full */
+        }
+        .legend-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem; /* text-xs */
+            margin-top: 4px; /* mt-1 */
+        }
+        #dateLegendBar {
+            background: linear-gradient(to left, var(--fog, #F2EFEC), #2B2A28);
+        }
+        #depthLegendBar {
+            background: linear-gradient(to right, #98edfa, #94f787,#f4c576, #f26e6e, #6857eb);
+        }
+        #fileSizeLegendBar {
+            background: linear-gradient(to left, rgb(226, 221, 219), rgb(0, 0, 0));
+        }
+
+        /* Bottom Row */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1fr; /* col-span-1 */
+            gap: 8px; /* gap-2 */
+            margin-bottom: 8px; /* mb-2 */
+        }
+        @media (min-width: 768px) {
+            .bottom-grid {
+                grid-template-columns: repeat(3, 1fr); /* md:grid-cols-3 */
+            }
+        }
+        .search-results-box {
+            grid-column: span 1 / span 1;
+            background-color: var(--fog, #F2EFEC);
+            padding: 8px;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        @media (min-width: 768px) {
+            .search-results-box {
+                grid-column: span 2 / span 2;
+            }
+        }
+
+        .guide-box {
+            grid-column: span 1 / span 1;
+            background-color: var(--fog, #F2EFEC);
+            border-radius: 0.5rem;
+            padding: 0px; 
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            /* max-width: 100%; max-w-7xl - adjusted */
+            /* display: flex; */
+            /* flex-direction: column; */
+        }
+
+        /* D3 Canvas Text Styles */
         text { 
             font-family: 'Roboto', sans-serif; 
             fill: black;
@@ -38,55 +337,31 @@
             text-anchor: middle; 
         }
 
-        /* Canvas element itself */
-        #folderViz {
-            /*display: block;
-            /* Remove extra space below canvas */
-            background-color: #F2EFEC;
-            /* Background for the canvas */
-            border-radius: rounded-4xl;
-            /* rounded-lg */
-            box-shadow: 0 6px 6px 0 rgba(0, 0, 0, 0.1);
-            /* shadow-inner */
-            cursor: crosshair;
-            /* Indicate draggable/zoomable */
-        }
-
-        #folderViz.grabbing {
-            cursor: grab;
-        }
-
+        /* Tooltip */
         .tooltip {
             position: absolute;
             text-align: left;
             padding: 8px;
-            background: #E2DDDB;
-            /* Dark background for tooltip */
+            background: var(--pebble, #E2DDDB);
             color: black;
-            /* Light text for tooltip */
             border: black;
             border-style: solid;
             border-width: 1px;
             border-radius: 6px;
             pointer-events: none;
-            /* Allows mouse events to pass through */
             opacity: 0;
-            /* Hidden by default */
             transition: opacity 0.2s ease;
             font-size: 15px;
             box-shadow: 0 4px 6px #000000;
             max-width: 250px;
-            /* Limit tooltip width */
             word-wrap: break-word;
-            /* Break long words */
         }
 
-        /* Style for the custom message box */
+        /* Message Box */
         .message-box-overlay {
             position: fixed;
             inset: 0;
-            background-color: #C9C4BD;
-            /* gray-600 with 50% opacity */
+            background-color: rgba(201, 196, 189, 0.5); /* #C9C4BD with 50% opacity */
             display: flex;
             align-items: center;
             justify-content: center;
@@ -97,1315 +372,229 @@
             background-color: #fff;
             padding: 1.5rem;
             border-radius: 0.5rem;
-            /* rounded-lg */
-            box-shadow: 0 10px 15px -3px #C9C4BD, 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            /* shadow-xl */
+            box-shadow: 0 10px 15px -3px var(--fossil, #C9C4BD), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
             max-width: 24rem;
-            /* max-w-sm */
             width: 100%;
             text-align: center;
         }
-
-        .breadcrumb-item {
-            cursor: pointer;
-            color: #0078d7;
-            /* Indigo-600 */
-            text-decoration: none;
+        .message-box-content button {
+            background-color: #2563eb; /* blue-600 */
+        }
+        .message-box-content button:hover {
+            background-color: #1d4ed8; /* blue-700 */
         }
 
-        .breadcrumb-item:hover {
-            text-decoration: underline;
-        }
-
-        .breadcrumb-item.current {
-            color: #585858;
-            /* Dark gray */
-            cursor: default;
-            text-decoration: none;
-        }
+        /* Utility classes replacement */
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .flex-wrap { flex-wrap: wrap; }
+        .justify-between { justify-content: space-between; }
+        .items-center { align-items: center; }
+        .space-x-2 > * + * { margin-left: 0.5rem; }
+        .list-disc { list-style-type: disc; }
+        .list-inside { list-style-position: inside; }
+        .hidden { display: none !important; }
+        .rounded-full { border-radius: 9999px; }
+        .w-4 { width: 1rem; }
+        .h-4 { height: 1rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mt-4 { margin-top: 1rem; }
+        .mt-2 { margin-top: 0.5rem; }
+        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+        .px-4 { padding-left: 1rem; padding-right: 1rem; }
     </style>
 </head>
 
-<body class="min-w-screen bg-[#C9C4BD] flex flex-col items-center justify-center p-2">
-    <div class="md:container bg-[#E2DDDB] mx-auto rounded-lg shadow-xl p-2 max-w-screen w-screen flex-auto flex-col">
-        <!-- Main Row: Controls (25%) and  Visualization (75%)-->
-        <div class="grid grid-cols-1 md:grid-cols-6 flex-row-reverse gap-2 mb-2">
-            <!-- Column 1: Controls (25% width) -->
-            <div class="col-span-1 md:col-span-1 bg-[#F2EFEC] p-2 rounded-lg shadow-inner md:min-w-0">
-                <h1 class="text-4xl font-extrabold text-center text-gray-800 mb-6">
+<body class="min-w-screen">
+    <div class="container-wrapper">
+        <div class="main-grid">
+            <div class="controls-column">
+                <h1>
                     Nircles
                 </h1>
-                <p class="text-gray-600 mb-4">
+                <p>
                     See all of your files and folders as nested circles, reveal the structure of your directories.
                 </p>
-                <h2 class="text-2xl font-bold text-gray-700 mb-4">Controls</h2>
-                <div class="flex flex-wrap justify-between w-full mb-4 gap-2">
-                    <input type="file" id="jsonFileLoad" accept=".json" class="hidden">
-                    <button id="loadJsonFileButton"
-                        class="bg-[#ED6631] hover:bg-[#000000]  text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-black-500 focus:ring-opacity-75">
+                <h2>Controls</h2>
+                <div class="controls-buttons">
+                    <input type="file" id="jsonFileLoad" accept=".json">
+                    <button id="loadJsonFileButton">
                         Load Summary
                     </button>
-                    <button id="zoomOutButton"
-                        class="bg-[#ED6631] hover:bg-[#000000]  text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-black-500 focus:ring-opacity-75">
+                    <button id="zoomOutButton">
                         Reset Zoom
                     </button>
-                    <button id="goUpButton"
-                        class="bg-[#ED6631] hover:bg-[#000000]  text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-black-500 focus:ring-opacity-75">
+                    <button id="goUpButton">
                         Go Up
                     </button>
                 </div> 
                 
-                <div class="mb-4">
-                    <label for="sortBy" class="block text-gray-700 text-sm font-bold mb-2">
+                <div class="input-group">
+                    <label for="sortBy" class="form-label">
                         Sort By:
                     </label>
-                    <select id="sortBy"
-                    class="shadow-sm border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-[#ED6631] focus:border-transparent">
+                    <select id="sortBy">
                     <option value="size">File size</option>
                     <option value="reverseSize">File Size Reverse</option>
                     <option value="name">File Name</option>
-                    <!-- <option value="type">File Type</option>
-                    <option value="date">Last Modified Date</option> -->
                     </select>
-                    
-                    <label class="block text-gray-700 text-sm font-bold mb-2">
+                </div> 
+                <div class="slidecontainer">
+                        <label for="paddingFactor" class="form-label">
+                            Padding:
+                            <input type="range" min="0" max="3600" value="100" class="slider" id="paddingFactor">
+                        </label>
+                        <label for="ignoreSize" class="form-label">
+                            Use file size:
+                            <input type="range" min="1" max="100" value="100" class="slider" id="ignoreSize" value="Yes">
+                            <label for="ignore">100%</label><br>
+                        </label>
+                        <label for="hideLabels">
+                            Hide labels
+                        </label>
+                        <input type="checkbox" id="hideLabels" value="Yes">
+                    </div>
+                     <div class="input-group">
+                         <button id="exportPngButton" class="py-2 px-4">
+                         Export PNG
+                        </button>
+                    </div>
+
+                <div class="input-group">    
+                    <label class="form-label">
                         Search:
                     </label>
-                    <input type="text" id="searchInput" placeholder="Search..."
-                    class="flex-grow mb-2 max-w-xs shadow-sm appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-[#ED6631] focus:border-transparent">
-                    <p class="text-gray-700 mb-1">
+                    <input type="text" id="searchInput" placeholder="Search...">
+                    <p class="detail-item text-sm">
                         <strong>Results:</strong> <span id="searchCount"></span>
                     </p>
-                    <p class="text-gray-700 mb-1">
+                    <p class="detail-item text-sm">
                         <strong>Total:</strong> <span id="searchSummary"></span>
                     </p>
                 </div>
                 
-                <!-- Placeholder for other controls if needed in the future -->
-            </div>
+                </div>
             
-            <!-- Column 2: Visualization (50% width) -->
-            <div id="visualizationColumn" class="col-span-4 items-center justify-between rounded-lg min-w-full">
-                <canvas id="folderViz" class="aspect-h-1 rounded-lg"></canvas>
-                <p class="text-gray-700 mb-1">
+            <div id="visualizationColumn" class="visualization-column">
+                <canvas id="folderViz"></canvas>
+                <p class="detail-item">
                 <strong>Breadcrumbs:</strong> <span id="breadcrumbs"></span>
             </p>  
-                    <p class="text-gray-700 mb-1">
+                    <p class="detail-item">
                         <strong>Copyable Path:</strong> <span id="detailPath"></span>
                     </p>
             </div>
-            <!-- Column 3: Controls (25% width) -->
-            <div class="col-span-1 md:col-span-1 bg-[#F2EFEC] p-2 rounded-lg shadow-inner md:min-w-0">
-                <h2 class="text-2xl font-bold text-gray-700 mb-2">Details</h2>
-                <div id="selectedItemDetails" class="text-gray-600">
-                    <h3 class="text-xl font-semibold text-gray-800 mb-2">
+            <div class="details-column">
+                <h2>Details</h2>
+                
+                <div class="input-group">
+                    <p class="text-xl font-semibold text-gray-800 mb-2">
+                        <strong>Main Summary:</strong> 
+                    </p>
+                    <span id="folderSummary"></span>
+                </div> 
+                <div id="selectedItemDetails" class="hidden">
+                    <h3>
                         Selected Item:
                     </h3>
-                    <p class="text-gray-700 mb-1">
+                    <p class="detail-item">
                         <strong>Name:</strong> <span id="detailName"></span>
                     </p>
-                    <p class="text-gray-700 mb-1">
+                    <p class="detail-item">
                         <strong>Type:</strong> <span id="detailType"></span>
                     </p>
-                    <p class="text-gray-700 mb-1">
+                    <p class="detail-item">
                         <strong>Sub-items:</strong> <span id="detailChildren"></span>
                     </p>
-                    <p class="text-gray-700 mb-1">
+                    <p class="detail-item">
                         <strong>Size:</strong> <span id="detailSize"></span>
                     </p>
-                    <p class="text-gray-700 mb-1">
+                    <p class="detail-item">
                         <strong>Last Modified:</strong>
                         <span id="detailLastModified"></span>
                     </p>
                 </div>
-                <div id="initialDetailsPrompt"
-                    class="text-gray-600 flex-grow flex items-center justify-center text-center">
+                <div id="initialDetailsPrompt">
                     <p>
                         Click on any circle in the visualization to see its details here.
                     </p>
                 </div>
                 
-            <!-- Column : Key -->
-
-                <!--    <div id="colorLegend" class="mt-4"> -->
-                <h2 class="text-2xl font-bold text-gray-700 mb-4">Colour Legend</h2>
-                <div class="mb-4">
-                    <label for="colorBy" class="block text-gray-700 text-sm font-bold mb-2">
+            <h2 class="mt-4">Colour Legend</h2>
+                <div class="input-group">
+                    <label for="colorBy" class="form-label">
                         Colour By:
                     </label>
-                    <select id="colorBy"
-                        class="shadow-sm border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-[#ED6631] focus:border-transparent">
+                    <select id="colorBy">
                         <option value="depth">Depth</option>
                         <option value="type">File Type</option>
                         <option value="fileSize">Size</option>
                         <option value="date">Last Modified Date</option>
                     </select>
                 </div>
-                <div id="typeLegendItems" class="flex flex-wrap gap-x-2 gap-y-1 text-sm">
-                    <!-- Legend items will be dynamically added here -->
-                </div>
-                <div id="dateLegendItems" class="hidden mt-2">
-                    <h4 class="font-semibold text-gray-700 mb-2">Last Modified Date</h4>
-                    <div class="h-4 w-full rounded-full"
-                        style="background: linear-gradient(to left, #F2EFEC, #2B2A28); /* Grey gradient */">
+                <div id="typeLegendItems">
                     </div>
-                    <div class="flex justify-between text-xs mt-1">
+                <div id="dateLegendItems" class="hidden">
+                    <h4>Last Modified Date</h4>
+                    <div id="dateLegendBar" class="legend-bar">
+                    </div>
+                    <div class="legend-labels">
                         <span id="minDateLabel"></span>
                         <span id="maxDateLabel"></span>
                     </div>
                 </div>
-                <div id="depthLegendItems" class="hidden mt-2">
-                    <h4 class="font-semibold text-gray-700 mb-2">Depth</h4>
-                    <div class="h-4 w-full rounded-full"
-                        style="background: linear-gradient(to right, #98edfa, #94f787,#f4c576, #f26e6e, #6857eb); /* Rainbow gradient */">
+                <div id="depthLegendItems" class="hidden">
+                    <h4>Depth</h4>
+                    <div id="depthLegendBar" class="legend-bar">
                     </div>
-                    <div class="flex justify-between text-xs mt-1">
+                    <div class="legend-labels">
                         <span id="minDateLabel"></span>
                         <span id="maxDateLabel"></span>
                     </div>
                 </div>
-                <div id="fileSizeLegendItems" class="hidden mt-2">
-                    <h4 class="font-semibold text-gray-700 mb-2">Folder Size</h4>
-                    <div class="h-4 w-full rounded-full"
-                        style="background: linear-gradient(to left,rgb(226 ,221 , 219), rgb(0,0,0));"></div>
-                    <div class="flex justify-between text-xs mt-1">
+                <div id="fileSizeLegendItems" class="hidden">
+                    <h4>Folder Size</h4>
+                    <div id="fileSizeLegendBar" class="legend-bar"></div>
+                    <div class="legend-labels">
                         <span id="minFileSizeLabel">Smallest</span>
                         <span id="maxFileSizeLabel">Largest</span>
                     </div>
                 </div>
             </div>
         </div>
-        <!-- Bottom Row: Key -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <!-- Column : Key (50% width) -->
-            <div class="col-span-1 bg-[#F2EFEC] p-2 rounded-lg shadow-inner">
-                <h2 class="text-2xl font-bold text-gray-700 mb-4">Options</h2>
-                <div class="slidecontainer">
-                        <label for="sortBy" class="block text-gray-700 text-sm font-bold mb-2">
-                            Padding:
-                            <input type="range" min="0" max="3600" value="3600" class="slider" id="paddingFactor">
-                        </label>
-                        <label for="sortBy" class="block text-gray-700 text-sm font-bold mb-2">
-                            Use file size:
-                            <input type="range" min="1" max="100" value="100" class="slider" id="ignoreSize" value="Yes">
-                        </label>
-                        <label for="ignore">100%</label><br>
-                        <label for="hideLabels">
-                            Hide labels
-                        </label>
-                        <input type="checkbox" id="hideLabels" value="Yes">
-                    </div>
-                <button id="exportPngButton"
-                class="bg-[#ED6631] hover:bg-[#000000] text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-black-500 focus:ring-opacity-75">
-                Export PNG
-            </button>
-        </div>
-        <div class="container bg-[#F2EFEC] mx-auto rounded-lg shadow-xl p-2 max-w-7xl w-full flex flex-col">
-            <h2 class="text-2xl font-bold text-gray-700 mb-4">Guide</h2>
-            <p class="text-gray-600 mb-4">
-                This is a demonstration of alternative folder visualisation techniques. Other examples include branching trees, tree maps, and sunburst diagrams.
-                These nested circles can be used to represent any arbitrarily complex hierarchy structure.
-                
-            </p>
-            <ul class="list-disc list-inside text-gray-600 mb-4">
-                <li>Larger circles or nested circles represent folders or directories.</li>
-                <li>Smaller, innermost circles represent individual files.</li>
-            </ul>
-            <p class="text-gray-600 mb-4"> 
-                Created by Gwen Protheroe 2025. 
-            </p>
+        <div class="bottom-grid">
+            <div class="search-results-box">
+                <h2>Search Results</h2>
+                <div id="searchItems">
+                </div>
+                <div id="initialSearchPrompt">
+                <p>
+                        Enter a search term to see up to 20 of the results listed here.
+                    </p>
+                </div>
+            </div>
+            <div class="guide-box">
+                <h2>Guide</h2>
+                <p>
+                    This is a demonstration of alternative folder visualisation techniques. Other examples include branching trees, tree maps, and sunburst diagrams.
+                    These nested circles can be used to represent any arbitrarily complex hierarchy structure.
+                    
+                </p>
+                <ul class="list-disc list-inside">
+                    <li>Larger circles or nested circles represent folders or directories.</li>
+                    <li>Smaller, innermost circles represent individual files.</li>
+                </ul>
+                <p> 
+                    Created by Gwen Protheroe 2025. 
+                </p>
+            </div>
         </div>
     </div>
 </div>
-</div>
 
     <div id="tooltip" class="tooltip"></div>
-
-	<!--                /////////////////////////////////////////////////////////////////
-	                /////////////////////////////////////////////////////////////////    
-                /////////////////////////////////////////////////////////////////
-            ////////////////////  Javascript Begins here  ///////////////////
-	    /////////////////////////////////////////////////////////////////
-    /////////////////////////////////////////////////////////////////  
-////////////////////////////////////////////////////////////////-->
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const canvas = document.getElementById('folderViz');
-            const ctx = canvas.getContext('2d');
-            const tooltip = d3.select("#tooltip");
-            const selectedItemDetails = document.getElementById('selectedItemDetails');
-            const initialDetailsPrompt = document.getElementById('initialDetailsPrompt');
-            const detailName = document.getElementById('detailName');
-            const detailType = document.getElementById('detailType');
-            const detailChildren = document.getElementById('detailChildren');
-            const detailSize = document.getElementById('detailSize');
-            const detailLastModified = document.getElementById('detailLastModified');
-            const detailPath = document.getElementById('detailPath');
-
-            const colorBySelect = document.getElementById('colorBy');
-            const sortBySelect = document.getElementById('sortBy');
-            const paddingFactorslider = document.getElementById('paddingFactor');
-            const ignoreSize = document.getElementById('ignoreSize');
-            const hideLabels = document.getElementById('hideLabels');
-            const typeLegendItems = document.getElementById('typeLegendItems');
-            const dateLegendItems = document.getElementById('dateLegendItems');
-            const depthLegendItems = document.getElementById('depthLegendItems');
-            const fileSizeLegendItems = document.getElementById('fileSizeLegendItems');
-            const minDateLabel = document.getElementById('minDateLabel');
-            const maxDateLabel = document.getElementById('maxDateLabel');
-            const minFileSizeLabel = document.getElementById('minFileSizeLabel');
-            const maxFileSizeLabel = document.getElementById('maxFileSizeLabel');
-
-            const jsonFileLoad = document.getElementById('jsonFileLoad');
-            const loadJsonFileButton = document.getElementById('loadJsonFileButton');
-            const zoomOutButton = document.getElementById('zoomOutButton');
-            const goUpButton = document.getElementById('goUpButton'); // New Go Up button
-            const exportPngButton = document.getElementById('exportPngButton'); // New Export PNG button
-            const searchInput = document.getElementById('searchInput'); // New Search input
-            const searchCount = document.getElementById('searchCount'); // Search result count
-            const searchSum = document.getElementById('searchSummary'); // Search result count
-            const breadcrumbsDiv = document.getElementById('breadcrumbs'); // New Breadcrumbs div
-
-            const visualizationColumn = document.getElementById('visualizationColumn');
-
-            let currentDataNodes = []; // Store the flattened nodes for event handling
-            let rootNodeData = null; // Store the original root data for full zoom out
-            let hoveredNode = null; // Track the node currently under the mouse
-            let selectedNode = null; // Track the node currently selected by click for details panel
-            let currentZoomNode = null; // Track the node currently zoomed into
-            let searchTerm = ''; // Current search term
-
-            // D3 Zoom transform state (k for scale, x/y for translate)
-            let transform = d3.zoomIdentity;
-
-            // Define color scales
-            const fileTypeColorScale = d3.scaleOrdinal(['#ED6631','#1A845C','#2A73D9','#F3BE0A','#E78F89',
-                '#B24D25','#126745','2056A3','#C08F08','#B55C56',
-                '#FBE0D6','#BDE2C7','#CADCF5','#FCEFC2','#FBE7E7',
-                                                        '#F9CFBF','#F7B89F','#F28F68', //shades of orange
-                                                        '#9AD2A9','#76C38B','#53B36D', //shades of green //(d3.schemeTableau10);
-                                                        '#B4CEF1','#94B9EC','#5F96E3', //shades of blue
-                                                        '#F5E3A4','#F9DF8A','#F6CE47', //shades of yellow
-                                                        '#F7DBDB','#F8D5D5','#F4B5B5'    //shades of himalayan salt pink - oh get lost branding people.
-                                                    ]); 
-            const fileSizeColorScale = d3.scalePow().exponent(0.1).range(["#2B2A28","#F2EFEC"]); //d3.scaleSequential(d3.interpolateBlues); // Using interpolateRainbow for all hues
-            // const fileDepthColorScale = d3.scaleLinear().range(['#FBE0D6','#B24D25']); //Shades of orange 
-            const fileDepthColorScale = d3.scaleLinear().range(["#98edfa","#f26e6e"]).interpolate(d3.interpolateHslLong); // Rainbow for folder depth
-            const dateColorScale = d3.scaleSqrt().range(["#000000","#FFFFFF"]); // Shades of black and white for folder depth
-
-            // Dummy Data
-            const defaultData = {
-  "path": "C:\\Demo",
-  "name": "Demo",
-  "type": "folder",
-  "value": "0",
-  "children": [
-    {
-      "path": "C:\\Demo\\Files and Folders",
-      "name": "Files and Folders",
-      "type": "folder",
-      "value": "0",
-      "children": [
-        {
-          "path": "C:\\Demo\\Files and Folders",
-          "name": "Email.txt",
-          "type": "txt",
-          "value": 56715,
-          "last_modified_unix": 1754869509.9825919,
-          "last_modified_iso": "2025-08-11T00:45:09.982592"
-        },
-        {
-          "path": "C:\\Demo\\Files and Folders",
-          "name": "Very simply",
-          "type": "folder",
-          "value": 0,
-          "last_modified_unix": 1753489154.0142784,
-          "last_modified_iso": "2025-07-26T01:19:14.014278",
-          "children":[
-            {
-          "path": "C:\\Demo\\Files and Folders\\Very simply",
-          "name": "Rick Deckards Blade Runner Blaster.mp4",
-          "type": "mp4",
-          "value": 290968,
-          "last_modified_unix": 1753489154.0142784,
-          "last_modified_iso": "2025-07-26T01:19:14.014278"
-        }
-          ]
-        }
-      ],
-      "last_modified_unix": 1754869475.4944975,
-      "last_modified_iso": "2025-08-11T00:44:35.494498"
-    },
-    {
-      "path": "C:\\Demo\\See All",
-      "name": "See All",
-      "type": "folder",
-      "value": "0",
-      "children": [
-        {
-          "path": "C:\\Demo\\See All\\Project 1",
-          "name": "Project 1",
-          "type": "folder",
-          "value": "0",
-          "last_modified_unix": 1754869174.2042792,
-          "last_modified_iso": "2025-08-11T00:39:34.204279",
-          "children": [
-            {
-              "path": "C:\\Demo\\See All\\Project 1",
-              "name": "Data - Copy.json",
-              "type": "json",
-              "value": 105486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            },
-            {
-              "path": "C:\\Demo\\See All\\Project 1",
-              "name": "Data.json",
-              "type": "json",
-              "value": 105486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            },
-            {
-              "path": "C:\\Demo\\See All\\Project 1",
-              "name": "Photo.jpg",
-              "type": "jpg",
-              "value": 105486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            },
-            {
-              "path": "C:\\Demo\\See All\\Project 1",
-              "name": "Email.msg",
-              "type": "msg",
-              "value": 105486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            },
-            {
-              "path": "C:\\Demo\\See All\\Project 1",
-              "name": "Report.txt",
-              "type": "txt",
-              "value": 211468,
-              "last_modified_unix": 1754691194.7485082,
-              "last_modified_iso": "2025-08-08T23:13:14.748508"
-            },
-            {
-              "path": "C:\\Demo\\See All\\Project 1",
-              "name": "Report_2.txt",
-              "type": "txt",
-              "value": 105486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            },
-            {
-              "path": "C:\\Demo\\See All\\Project 1",
-              "name": "Report.txt",
-              "type": "txt",
-              "value": 105486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            }
-          ]
-        },
-        {
-          "path": "C:\\Demo\\See All\\Project 2",
-          "name": "Project 2",
-          "type": "folder",
-          "value": "0",
-          "last_modified_unix": 1754687388.2418442,
-          "last_modified_iso": "2025-08-08T22:09:48.241844",
-          "children": [
-            {
-              "path": "C:\\Demo\\See All\\Project 2",
-              "name": "Data.jpg",
-              "type": "jpg",
-              "value": 105486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            },
-            {
-              "path": "C:\\Demo\\See All\\Project 2",
-              "name": "Email.msg",
-              "type": "msg",
-              "value": 105486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            },
-            {
-              "path": "C:\\Demo\\See All\\Project 2",
-              "name": "Report.txt",
-              "type": "txt",
-              "value": 105486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            }
-          ]
-        },
-        {
-          "path": "C:\\Demo\\See All\\Project 3",
-          "name": "Project 3",
-          "type": "folder",
-          "value": "0",
-          "last_modified_unix": 1754687390.5936754,
-          "last_modified_iso": "2025-08-08T22:09:50.593675",
-          "children": [
-            {
-              "path": "C:\\Demo\\See All\\Project 3",
-              "name": "World Domination.doc",
-              "type": "doc",
-              "value": 145486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            },
-            {
-              "path": "C:\\Demo\\See All\\Project 3",
-              "name": "Nircles.msg",
-              "type": "msg",
-              "value": 15486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            },
-            {
-              "path": "C:\\Demo\\See All\\Project 3",
-              "name": "Report.txt",
-              "type": "txt",
-              "value": 105486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            }
-          ]
-        },
-        {
-          "path": "C:\\Demo\\See All",
-          "name": "New Text Document.txt",
-          "type": "txt",
-          "value": 2000,
-          "last_modified_unix": 1754869366.4957943,
-          "last_modified_iso": "2025-08-11T00:42:46.495794"
-        }
-      ],
-      "last_modified_unix": 1754869366.4957943,
-      "last_modified_iso": "2025-08-11T00:42:46.495794"
-    },
-    {
-      "path": "C:\\Demo\\Of Your",
-      "name": "Of Your",
-      "type": "folder",
-      "value": "0",
-      "children": [
-        {
-          "path": "C:\\Demo\\Of Your\\Alpha",
-          "name": "Alpha",
-          "type": "folder",
-          "value": "0",
-          "last_modified_unix": 1754690947.0562656,
-          "last_modified_iso": "2025-08-08T23:09:07.056266",
-          "children": [
-            {
-              "path": "C:\\Demo\\Of Your\\Alpha",
-              "name": "Data.json",
-              "type": "json",
-              "value": 125486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            },
-            {
-              "path": "C:\\Demo\\Of Your\\Alpha",
-              "name": "Email.msg",
-              "type": "msg",
-              "value": 105486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            },
-            {
-              "path": "C:\\Demo\\Of Your\\Alpha",
-              "name": "Photo.png",
-              "type": "png",
-              "value": 105486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            }
-          ]
-        },
-        {
-          "path": "C:\\Demo\\Of Your\\Beta",
-          "name": "Beta",
-          "type": "folder",
-          "value": "0",
-          "last_modified_unix": 1754687428.2360988,
-          "last_modified_iso": "2025-08-08T22:10:28.236099",
-          "children": [
-            {
-              "path": "C:\\Demo\\Of Your\\Beta",
-              "name": "Data.json",
-              "type": "json",
-              "value": 55486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            },
-            {
-              "path": "C:\\Demo\\Of Your\\Beta",
-              "name": "Email.msg",
-              "type": "msg",
-              "value": 45486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            },
-            {
-              "path": "C:\\Demo\\Of Your\\Beta",
-              "name": "Report.doc",
-              "type": "doc",
-              "value": 35486,
-              "last_modified_unix": 1754352061.709732,
-              "last_modified_iso": "2025-08-05T01:01:01.709732"
-            }
-          ]
-        }
-      ],
-      "last_modified_unix": 1754869202.896482,
-      "last_modified_iso": "2025-08-11T00:40:02.896482"
-    }
-  ],
-  "last_modified_unix": 1754869174.2052796,
-  "last_modified_iso": "2025-08-11T00:39:34.205280"
-};
-
-            // Initial load with dummy data
-            rootNodeData = defaultData;
-            processAndRenderVisualization(rootNodeData);
-            updateBreadcrumbs();
-
-
-            // D3 Zoom behavior
-            const zoom = d3.zoom()
-                .scaleExtent([0.01, 1000]) // Allow zooming from 10% to 10000%
-                .on("zoom", (event) => {
-                    transform = event.transform;
-                    drawVisualization();
-                });
-
-            // Apply zoom behavior to the canvas
-            d3.select(canvas).call(zoom);
-
-
-            //////////////////////////////////////////////////////////////////////////////
-            ///////////////////    Event listeners for everything ////////////////////////
-            //////////////////////////////////////////////////////////////////////////////
-            // Event listener for the "Load JSON File" button
-            loadJsonFileButton.addEventListener('click', function () {
-                jsonFileLoad.click(); // Trigger the hidden file input click
-            });
-
-            // Event listener for when a file is selected via the input
-            jsonFileLoad.addEventListener('change', function (event) {
-                const file = event.target.files[0];
-                if (!file) {
-                    return; // No file selected
-                }
-
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    try {
-                        rootNodeData = JSON.parse(e.target.result); // Store original root data
-                        processAndRenderVisualization(rootNodeData);
-                        resetZoom(); // Reset zoom to fit the new data
-                        searchInput.value = ''; // Clear search on new load
-                        searchTerm = '';
-                        updateBreadcrumbs();
-                    } catch (error) {
-                        displayMessageBox("Error reading or parsing the JSON file.\nError: " + error.message, "Error");
-                    }
-                };
-                reader.onerror = function () {
-                    displayMessageBox("Failed to read the file.", "Error");
-                };
-                reader.readAsText(file); // Read the file content as text
-            });
-
-            // Event listener for color selection change
-            colorBySelect.addEventListener('change', function () {
-                if (currentDataNodes.length > 0) {
-                    processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-                    drawVisualization(); // Re-draw with new color scheme
-                }
-            });
-           
-            // Event listener for sorting criteria change
-            sortBySelect.addEventListener('change', function () {
-                processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-                zoomToNode(currentZoomNode); // Reset zoom to fit the new data
-            });
-            // Event listener for sorting criteria change
-            hideLabels.addEventListener('change', function () {
-                processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-                zoomToNode(currentZoomNode); // Reset zoom to fit the new data
-            });
-                        
-            // Event listener for padding criteria input
-            paddingFactorslider.addEventListener('input', function () {
-                processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-                zoomToNode(currentZoomNode); // Reset zoom to fit the new data
-            });
-
-            // Event listener for file size criteria change
-            ignoreSize.addEventListener('input', function () {
-                processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-                zoomToNode(currentZoomNode); // Reset zoom to fit the new data
-            });
-
-            // Event listener for Zoom Out button
-            zoomOutButton.addEventListener('click', function () {
-                zoomToNode(currentZoomNode);
-            });
-
-            // Event listener for Go Up button
-            goUpButton.addEventListener('click', function () {
-                if (currentZoomNode && currentZoomNode.parent) {
-                    zoomToNode(currentZoomNode.parent);
-                } else {
-                    resetZoom(); // If no parent, go to root
-                }
-            });
-
-            // Event listener for Export PNG button
-            exportPngButton.addEventListener('click', function () {
-                exportCanvasAsPNG();
-            });
-
-            // Event listener for Search input
-            searchInput.addEventListener('input', function () {
-                searchTerm = this.value.toLowerCase();
-                drawVisualization(); // Redraw to apply search highlighting
-            });
-
-
-            //////////////////////////////////////////////////////////////////
-            /////////////        Draw                       //////////////////
-            //////////////////////////////////////////////////////////////////
-            // Function to process data and then draw
-            function processAndRenderVisualization(data) {
-                const containerWidth = visualizationColumn.offsetWidth;
-                // Set canvas height relative to window height, capped by container width for square aspect
-                const containerHeight = Math.min(containerWidth, window.innerHeight*0.9);
-
-                canvas.width = containerWidth;
-                canvas.height = containerHeight;
-
-                const root = d3.hierarchy(data)
-                    .sum(d => Math.pow(d.value, ignoreSize.value /100))  //ignoreSize.checked ?  (d.value / d.value) : +d.value)
-                    .sort((a, b) => sortItOut(a,b));
-
-                const pack = d3.pack()
-                    .size([containerWidth,containerHeight])
-                    .padding(Math.sqrt(paddingFactorslider.value) / 20);  //Original value 0.3
-
-                currentDataNodes = pack(root).descendants();
-                setColorDomains();
-                drawVisualization();
-            }
-
-            function isEven(n) {return n % 2 == 0;}
-            function isOdd(n) {return Math.abs(n % 2) == 1}
-            function applyCurrentZoom(){
-                // Apply current zoom transform
-                ctx.save();
-                ctx.translate(transform.x, transform.y);
-                ctx.scale(transform.k, transform.k);
-            }
-
-
-            // Function to draw all circles and text on the canvas
-            function drawVisualization() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the entire canvas
-
-                
-                applyCurrentZoom();
-                
-                // Helper to check if a node matches the search term
-                const matchesSearch = (d) => d.data.name.toLowerCase().includes(searchTerm);
-                searchCount.textContent = "";
-                searchSum.textContent = "";
-                
-                if (searchTerm !== '') {
-                    const match = currentDataNodes.filter(matchesSearch).length ;
-                    const matchSum = currentDataNodes.filter(matchesSearch);
-                    let thisSum = 0
-                    matchSum.forEach(d => {
-                        thisSum = thisSum + d.value
-                    });
-                    searchCount.textContent = match;
-                    searchSum.textContent = formatBytes(thisSum);
-                    //White background if searching for something
-                    ctx.beginPath();
-                    ctx.arc(canvas.width / 2, canvas.height / 2, canvas.height / 2, 0, 2 * Math.PI);
-                    ctx.fillStyle = "#F2EFEC";
-                    ctx.fill();
-                }
-                
-                // Draw directories first (largest to smallest radius), then files
-                const directories = currentDataNodes.filter(d => d.children).sort((a, b) => b.r - a.r);
-                directories.forEach(d => {
-                    ctx.beginPath();
-                    ctx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
-                    ctx.fillStyle = getNodeColor(d);
-                    //ctx.fill();
-                    
-                    // Highlight for hover, selection, zoom, or search match
-                    let strokeColor = "#272730"; // Default black
-                    let lineWidth = 0.5 / transform.k;
-                    
-                    if (d === hoveredNode || d === selectedNode || d === currentZoomNode) {
-                        strokeColor = "#ED6631"; // Orange for active states
-                        lineWidth = 2.5 / transform.k;
-                    }
-
-                    if (searchTerm !== '' && matchesSearch(d)) {
-                        strokeColor = "#F28F68"; // Orange tint for search match
-                        lineWidth = 3.5 / transform.k;
-                    }
-
-                    ctx.strokeStyle = strokeColor;
-                    ctx.lineWidth = lineWidth;
-                    //ctx.stroke();
-                    
-                    ctx.globalAlpha = 1.0; // Reset opacity
-                    // Dim non-matching nodes if a search term is active
-                    if (searchTerm !== '' && !matchesSearch(d)) {
-                        ctx.globalAlpha = 0.1; // Reduce opacity
-                    }
-                    ctx.fill();
-                    ctx.stroke();
-                });
-
-
-/////////////////////// Draw the Files ///////////////////////////////////
-
-                const files = currentDataNodes.filter(d => !d.children);
-                files.forEach(d => {
-                    ctx.beginPath();
-                    ctx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
-                    ctx.fillStyle = getNodeColor(d);
-                    //ctx.fill();
-
-                    // Highlight for hover, selection, zoom, or search match
-                    let strokeColor = getNodeColor(d);//  "#ffffff"; // Default folder yellow
-                    let lineWidth = 0.5 / transform.k;
-
-                    if (d === hoveredNode || d === selectedNode) {
-                        strokeColor = "#ED6631"; // Orange for active states
-                        lineWidth = 2.5 / transform.k;
-                        
-                    }
-
-                    if (searchTerm !== '' && matchesSearch(d)) {
-                        strokeColor = "#F28F68";  // Orange tint for search match
-                        lineWidth = 3.5 / transform.k;
-                    }
-
-                    ctx.strokeStyle = strokeColor;
-                    ctx.lineWidth = lineWidth;
-                    //ctx.stroke();
-
-                    ctx.globalAlpha = 1.0; // Reset opacity
-                    // Dim non-matching nodes if a search term is active
-                    if (searchTerm !== '' && !matchesSearch(d)) {
-                        ctx.globalAlpha = 0.1; // Reduce opacity
-                    }
-                        ctx.fill();
-                        ctx.stroke();
-                });
-               // drawFiles();
-
-                    ///////////////////////////////////////////////// Draw text labels        ///////////////////////////
-                    currentDataNodes.forEach(d => {
-            // Text visibility: only show if the node itself is the currentZoomNode,
-            // or if its parent is the currentZoomNode, or if no node is zoomed (root view).
-            const relSize = 2* d.r * transform.k;
-            const isVisibleInZoom = (!hideLabels.checked && currentZoomNode === null && d.depth === 0) || // Show root if not zoomed
-                            (!hideLabels.checked && currentZoomNode !== null && d === currentZoomNode) ||// || (d.parent === currentZoomNode)));
-                            !hideLabels.checked && d.parent === currentZoomNode && ( 1.3 * Math.min(canvas.width,canvas.height) > relSize) && ( relSize > 100); // Visible size range
-
-            if (isVisibleInZoom) {
-                const text = d.data.name;
-                ctx.globalAlpha = 1.0; // Reset opacity
-                titleFont = "Roboto, sans-serif";
-                // Dim non-matching nodes if a search term is active
-                if (searchTerm !== '' && !matchesSearch(d)) {
-                    ctx.globalAlpha = 0.1; // Reduce opacity
-                }
-                let textangle = 30;
-                if (isEven(d.depth)) {
-                    textangle = -30;
-                }
-                //Folder Text
-                if (d.children){
-                    var fontSizeTitle = 18 / (transform.k*1.2)
-                    if (d === currentZoomNode){
-                        fontSizeTitle = fontSizeTitle *2;
-                    }
-                    var mainTextColor = [74, 74, 74]//"#4A4A4A",
-                    ctx.fillStyle = "#00000e";
-                drawCircularText( ctx, text, fontSizeTitle, titleFont, d.x, d.y, d.r, textangle, 0);//drawCircularText
-                // drawCircularText( ctx, d.data.last_modified_unix, fontSizeTitle, titleFont, d.x, d.y, d.r, -textangle, 0);//drawCircularText
-                } else {
-                    var fontSize = 14 / (transform.k)
-                    // ctx.fillStyle = 'rgb(25,25,25)'
-                    // ctx.textAlign = 'center' // Ensure we draw in exact center
-                    // ctx.fillText(text, d.x, d.y);
-                    if (d.parent === currentZoomNode){
-                        drawCircularText( ctx, text, fontSize, titleFont, d.x, d.y, d.r*0.75, 0, 0);//drawCircularText
-                    }
-                }
-            }
-        });
-                 ctx.restore(); // Restore context to original state
-            }
-
-            ////////////////////////////////////////////////////////////// 
-            ////////////////////  Circular Text  /////////////////////////
-            ////////////////////////////////////////////////////////////// 
-
-            //Adjusted from: http://blog.graphicsgen.com/2015/03/html5-canvas-rounded-text.html
-            function drawCircularText(ctx, text, fontSize, titleFont, centerX, centerY, radius, startAngle, kerning) {
-                // startAngle:   In degrees, Where the text will be shown. 0 degrees if the top of the circle
-                // kerning:     0 for normal gap between letters. Positive or negative number to expand/compact gap in pixels
-
-                ctx.strokeStyle = 'white';
-                // setup these to match Of Your needs
-                ctx.miterLimit = 2;
-                ctx.lineJoin = 'circle';
-                
-                //Setup letters and positioning
-                ctx.textBaseline = 'alphabetic'
-                ctx.textAlign = 'center' // Ensure we draw in exact center
-                ctx.fillStyle = 'rgb(25,25,25)'
-                
-                startAngle = startAngle * (Math.PI / 180) // convert to radians
-                text = text.toString().split('').reverse().join('') // Reverse letters
-                ctx.font = fontSize  + 'px ' + titleFont;
-                
-                //Rotate 50% of total angle for center alignment
-                for (var j = 0; j < text.length; j++) {
-                    var charWid = ctx.measureText(text[j]).width
-                    startAngle += (charWid + (j == text.length - 1 ? 0 : kerning)) / radius / 2
-                } //for j
-
-                ctx.save() //Save the default state before doing any transformations
-                ctx.translate(centerX, centerY) // Move to center
-                ctx.rotate(startAngle) //Rotate into final start position
-                
-                //Now for the fun bit: draw, rotate, and repeat
-                for (var j = 0; j < text.length; j++) {
-                    var charWid = ctx.measureText(text[j]).width / 2 // half letter
-                    //Rotate half letter
-                    ctx.rotate(-charWid / radius)
-                    //Draw the character at "top" or "bottom" depending on inward or outward facing
-                    // draw an outline, then filled
-                    ctx.lineWidth = 0.15* fontSize ;
-                    ctx.lineJoin = "round";
-                    ctx.strokeText(text[j], 0, -radius);
-                    //Rotate half letter
-                    ctx.rotate(-(charWid + kerning) / radius)
-                } //for j
-
-                ctx.restore() //Restore to state as it was before transformations
-
-                ctx.save() //Save the default state before doing any transformations
-                ctx.translate(centerX, centerY) // Move to center
-                ctx.rotate(startAngle) //Rotate into final start position
-                
-                //Now for the fun bit: draw, rotate, and repeat
-                for (var j = 0; j < text.length; j++) {
-                    var charWid = ctx.measureText(text[j]).width / 2 // half letter
-                    //Rotate half letter
-                    ctx.rotate(-charWid / radius)
-                    //Draw the character at "top" or "bottom" depending on inward or outward facing
-                    // draw an outline, then filled
-                    ctx.lineWidth = 0;
-                    ctx.fillText(text[j], 0, -radius)
-                    //Rotate half letter
-                    ctx.rotate(-(charWid + kerning) / radius)
-                } //for j
-
-                ctx.restore()//
-            } //function drawCircularText
-
-
-	////////////////////////////////////////////////////////////// 
-	//////////////////  Sorting Options  /////////////////////////
-	////////////////////////////////////////////////////////////// 
-            // Function to sort based on selected option
-            function sortItOut (a,b){
-                const sortMode = sortBySelect.value;
-                if (sortMode === "size"){
-                    return b.value - a.value;
-                } else if (sortMode === "type"){
-                    return d3.descending(a.type, b.type);
-                } else if (sortMode === "reverseSize"){
-                    return a.value - b.value;
-                } else if (sortMode === "date"){
-                    return b.last_modified_unix - a.last_modified_unix;
-                } else  if (sortMode === "name"){
-                    return d3.descending(a.name, b.name);
-                }
-            }
-            // Function to sort based on selected option
-            function sumItOut (d){
-                const sortMode = sortBySelect.value;
-                if (sortMode === "size"){
-                    return d.value ? +d.value : 1;
-                } else if (sortMode === "type"){
-                    return d.type  ? +d.type : 1;
-                } else if (sortMode === "reverseSize"){
-                    return d.value ? -d.value : 1;
-                } else if (sortMode === "date"){
-                    return d.last_modified_unix ? + a.last_modified_unix : 1;
-                } else  if (sortMode === "name"){
-                    return d.name  ? +d.name : 1;
-                }
-            }
-
-	////////////////////////////////////////////////////////////// 
-	//////////////////      Colours      /////////////////////////
-	//////////////////////////////////////////////////////////////
-            function setColorDomains() {
-                // Set domains for color scales
-                const fileTypes = Array.from(new Set(currentDataNodes.filter(d => !d.children && d.data.type).map(d => d.data.type)));
-                fileTypeColorScale.domain(fileTypes);
-
-                const allDates = currentDataNodes.filter(d => d.data.last_modified_unix).map(d => d.data.last_modified_unix);
-                const minDate = d3.min(allDates);
-                const maxDate = d3.max(allDates);
-                dateColorScale.domain([minDate, maxDate]);
-
-                const allFileSizes = currentDataNodes.filter(d => !d.children).map(d => d.value);
-                const minFileSize = d3.min(allFileSizes) || 0;
-                const maxFileSize = d3.max(allFileSizes) || 1; // Avoid division by zero
-                fileSizeColorScale.domain([minFileSize, maxFileSize]);
-
-                const allFileDepths = currentDataNodes.filter(d => !d.children).map(d => d.depth);
-                const minFileDepth = d3.min(allFileDepths);
-                const maxFileDepth = d3.max(allFileDepths);
-                fileDepthColorScale.domain([0, 5]);
-
-                // Update legend labels
-                minDateLabel.textContent = minDate ? new Date(minDate * 1000).toLocaleDateString() : '';
-                maxDateLabel.textContent = maxDate ? new Date(maxDate * 1000).toLocaleDateString() : '';
-                minFileSizeLabel.textContent = minFileSize ? formatBytes(minFileSize) : 'Smallest';
-                maxFileSizeLabel.textContent = maxFileSize ? formatBytes(maxFileSize) : 'Largest';
-
-                updateColorLegend(fileTypes);
-            }
-
-            // Function to get color based on selected option
-            function getNodeColor(d) {
-                const colorMode = colorBySelect.value;
-                //} else { // It's a file
-                if (colorMode === "depth") {
-                    return fileDepthColorScale(d.depth); 
-                } else if (colorMode === "date") {
-                    return d.data.last_modified_unix ? dateColorScale(d.data.last_modified_unix) : "#cccccc"; // Default grey if no date
-                } else if (colorMode === "fileSize") {
-                    return fileSizeColorScale(d.value); //Files also show size
-                } else {
-                    if (!d.children) { // It's a directory (folder)
-                    return fileTypeColorScale(d.data.type);
-                }
-                return fileSizeColorScale(d.value); // Directories always show gradient
-                }
-                return "#E2DDDB"; // Fallback default color
-            }
-
-            // Zoom functionality
-            function zoomToNode(node) {
-                const width = canvas.width;
-                const height = canvas.height;
-                
-                // Calculate new scale (k) and translation (tx, ty)
-                const k = Math.min(width, height) / (node.r * 2.2); // Add a little padding
-                const tx = width / 2 - node.x * k;
-                const ty = height / 2 - node.y * k;
-                
-                // Use D3 transition for smooth zoom
-                d3.transition().duration(750).tween("zoom", function () {
-                    const i = d3.interpolate(transform, d3.zoomIdentity.translate(tx, ty).scale(k));
-                    return function (t) {
-                        transform = i(t);
-                        drawVisualization();
-                    };
-                }).on("end", () => {
-                    updateBreadcrumbs(); // Update breadcrumbs after zoom transition ends
-                });
-                currentZoomNode = node;
-            }
-
-            function resetZoom() {
-                currentZoomNode = currentDataNodes[0];
-                zoomToNode(currentZoomNode);
-            }
-
-	////////////////////////////////////////////////////////////// 
-	/////////////////  Update Breadcrumbs  ///////////////////////
-	////////////////////////////////////////////////////////////// 
-            function updateBreadcrumbs() {
-                breadcrumbsDiv.innerHTML = ''; // Clear previous breadcrumbs
-                if (!rootNodeData) return;
-
-                let pathNodes = [];
-                let currentNode = currentZoomNode || d3.hierarchy(rootNodeData); // Start from zoomed node or root
-
-                while (currentNode) {
-                    pathNodes.unshift(currentNode); // Add to the beginning to get root first
-                    currentNode = currentNode.parent;
-                }
-
-                pathNodes.forEach((node, i) => {
-                    const span = document.createElement('span');
-                    span.textContent = node.data.name;
-                    span.className = 'breadcrumb-item';
-
-                    if (node === currentZoomNode || (currentZoomNode === null && i === pathNodes.length - 1)) {
-                        span.classList.add('current');
-                    } else {
-                        span.addEventListener('click', () => zoomToNode(node));
-                    }
-                    breadcrumbsDiv.appendChild(span);
-
-                    if (i < pathNodes.length - 1) {
-                        const separator = document.createElement('span');
-                        separator.textContent = '\n';
-                        separator.className = 'mx-1 text-gray-400';
-                        breadcrumbsDiv.appendChild(separator);
-                    }
-                });
-            }
-
-
-	////////////////////////////////////////////////////////////// 
-	/////////////////////// Export PNG  //////////////////////////
-	////////////////////////////////////////////////////////////// 
-            function exportCanvasAsPNG() {
-                const dataURL = canvas.toDataURL('image/png');
-                const a = document.createElement('a');
-                a.href = dataURL;
-                a.download = 'folder_visualization.png';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            }
-
-            
-	////////////////////////////////////////////////////////////// 
-	/////////////////////// Mouse Events  ////////////////////////
-	////////////////////////////////////////////////////////////// 
-            // Event listener for mouse movement on canvas
-            canvas.addEventListener('mousemove', function (event) {
-                const rect = canvas.getBoundingClientRect();
-                // Transform mouse coordinates based on current zoom
-                const mouseX = (event.clientX - rect.left - transform.x) / transform.k;
-                const mouseY = (event.clientY - rect.top - transform.y) / transform.k;
-
-                let foundNode = null;
-                // Iterate through nodes in reverse order to detect smaller, top-most circles first
-                for (let i = currentDataNodes.length - 1; i >= 0; i--) {
-                    const d = currentDataNodes[i];
-                    const dx = mouseX - d.x;
-                    const dy = mouseY - d.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-
-                    if (distance < d.r) {
-                        foundNode = d;
-                        break;
-                    }
-                }
-
-                if (foundNode !== hoveredNode) {
-                    hoveredNode = foundNode;
-                    drawVisualization(); // Redraw to update hover highlight  <br/>Sub-items: ${hoveredNode.children.length}
-                    // <br/>Type: ${hoveredNode.data.type || "Folder"}
-                    // <br/>Full Path: ${hoveredNode.data.path}
-                    // <br/>Size: ${formatBytes(hoveredNode.value)}
-                    // <br/>Last Modified: ${hoveredNode.data.last_modified_iso ? new Date(hoveredNode.data.last_modified_unix * 1000).toLocaleDateString() : "N/A"}`)
-
-                    if (hoveredNode) {
-                        tooltip.style("opacity", 0.75)
-                            .html(`<strong>${hoveredNode.data.name}</strong>
-                            `)
-                            .style("left", (event.pageX + 40) + "px")
-                            .style("top", (event.pageY - 28) + "px");
-                    } else {
-                        tooltip.style("opacity", 0);
-                    }
-                }
-            });
-
-            // Event listener for mouse leaving canvas
-            canvas.addEventListener('mouseout', function () {
-                if (hoveredNode) {
-                    hoveredNode = null;
-                    drawVisualization(); // Redraw to remove hover highlight
-                    tooltip.style("opacity", 0);
-                }
-            });
-
-            // Event listener for click on canvas
-            canvas.addEventListener('click', function (event) {
-                const rect = canvas.getBoundingClientRect();
-                // Transform mouse coordinates based on current zoom
-                const mouseX = (event.clientX - rect.left - transform.x) / transform.k;
-                const mouseY = (event.clientY - rect.top - transform.y) / transform.k;
-
-                let clickedNode = null;
-                // Iterate through nodes in reverse order to detect smaller, top-most circles first
-                for (let i = currentDataNodes.length - 1; i >= 0; i--) {
-                    const d = currentDataNodes[i];
-                    const dx = mouseX - d.x;
-                    const dy = mouseY - d.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-
-                    if (distance < d.r) {
-                        clickedNode = d;
-                        break;
-                    }
-                }
-
-                if (clickedNode) {
-                    selectedNode = clickedNode; // Update selected node for details panel
-                    zoomToNode(clickedNode); // Zoom to the clicked node
-
-                    // Display details in the third column
-                    selectedItemDetails.classList.remove('hidden');
-                    initialDetailsPrompt.classList.add('hidden');
-
-                    detailName.textContent = selectedNode.data.name;
-                    detailType.textContent = selectedNode.data.type || "Folder";
-                    if (selectedNode.data.children){
-                    detailChildren.textContent = selectedNode.data.children.length + " Children";
-                    } else {
-                        detailChildren.textContent = "";
-                    }
-                    detailSize.textContent = formatBytes(selectedNode.value);
-                    detailLastModified.textContent = selectedNode.data.last_modified_iso ? new Date(selectedNode.data.last_modified_unix * 1000).toLocaleString() : "N/A";
-                    if (selectedNode.data.children){
-                        detailPath.textContent = selectedNode.data.path;
-                    } else {
-                        detailPath.textContent = selectedNode.data.path + "\\" + selectedNode.data.name;
-                    }
-                    
-                    //Breadcrumbs or full path needs updating
-                    drawVisualization(); // Redraw to remove selection highlight
-                } else {
-                    // If click occurred outside any node, clear selection and zoom out
-                    if (selectedNode) {
-                        selectedNode = null;
-                        drawVisualization(); // Redraw to remove selection highlight
-                    }
-                    selectedItemDetails.classList.add('hidden');
-                    initialDetailsPrompt.classList.remove('hidden');
-                    resetZoom(); // Zoom out to full view
-                }
-            });
-
-
-            // Function to format bytes into human-readable format
-            function formatBytes(bytes, decimals = 2) {
-                if (bytes === 0) return '0 Bytes';
-                const k = 1024;
-                const dm = decimals < 0 ? 0 : decimals;
-                const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-            }
-
-            function updateColorLegend(fileTypes) {
-                const colorMode = colorBySelect.value;
-
-                // Hide all legends initially
-                typeLegendItems.classList.add('hidden');
-                dateLegendItems.classList.add('hidden');
-                depthLegendItems.classList.add('hidden');
-                fileSizeLegendItems.classList.add('hidden');
-
-                if (colorMode === "type") {
-                    typeLegendItems.classList.remove('hidden');
-                    typeLegendItems.innerHTML = ''; // Clear previous legend items
-
-                    // Add legend item for folders (default gray)
-                    const folderLegendItem = document.createElement('div');
-                    folderLegendItem.className = 'flex items-center space-x-2';
-                    folderLegendItem.innerHTML = `
-                        <span class="w-4 h-4 rounded-full" style="background-color: #cbd5e1;"></span>
-                        <span>Folder</span>
-                    `;
-                    typeLegendItems.appendChild(folderLegendItem);
-
-                    // Add legend items for file types
-                    fileTypes.forEach(type => {
-                        const legendItem = document.createElement('div');
-                        legendItem.className = 'flex items-center space-x-2';
-                        legendItem.innerHTML = `
-                            <span class="w-4 h-4 rounded-full" style="background-color: ${fileTypeColorScale(type)};"></span>
-                            <span>.${type}</span>
-                        `;
-                        typeLegendItems.appendChild(legendItem);
-                    });
-                } else if (colorMode === "date") {
-                    dateLegendItems.classList.remove('hidden');
-                } else if (colorMode === "depth") {
-                    depthLegendItems.classList.remove('hidden');
-                } else if (colorMode === "fileSize") {
-                    fileSizeLegendItems.classList.remove('hidden');
-                }
-            }
-
-            // Custom message box function (replaces alert)
-            function displayMessageBox(message, type = "Info") {
-                const messageBox = document.createElement('div');
-                messageBox.className = `message-box-overlay`;
-                messageBox.innerHTML = `
-                    <div class="message-box-content">
-                        <h3 class="text-xl font-bold mb-4 ${type === 'Error' ? 'text-red-600' : 'text-blue-600'}">${type}</h3>
-                        <p class="text-gray-700 mb-6">${message}</p>
-                        <button id="closeMessageBox" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">OK</button>
-                    </div>
-                `;
-                document.body.appendChild(messageBox);
-
-                document.getElementById('closeMessageBox').addEventListener('click', function () {
-                    document.body.removeChild(messageBox);
-                });
-            }
-
-            // Add a resize observer to redraw the canvas when its container changes size
-            const resizeObserver = new ResizeObserver(entries => {
-                for (let entry of entries) {
-                    if (entry.target === visualizationColumn) {
-                        const newWidth = entry.contentRect.width;
-                        // Set new height relative to window height, capped by newWidth for square aspect
-                        const newHeight = Math.min(newWidth, window.innerHeight * 0.8);
-
-                        if (canvas.width !== newWidth || canvas.height !== newHeight) {
-                            canvas.width = newWidth;
-                            canvas.height = newHeight;
-
-                            if (rootNodeData) {
-                                // Re-process and redraw with new dimensions if data is loaded
-                                processAndRenderVisualization(rootNodeData);
-                                // Reset zoom after resize to fit new dimensions
-                                resetZoom();
-                            } else {
-                                ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear if no data
-                            }
-                        }
-                    }
-                }
-            });
-
-            // Start observing the visualization column for size changes
-            resizeObserver.observe(visualizationColumn);
-        });
-    </script>
+	<script src="NirclesScript.js"></script>
 </body>
 
 </html>
