@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circles of Life</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="min-w-screen">
+    <div class="container-wrapper">
+        <div class="main-grid">
+            <div class="controls-column">
+                <h1>
+                    Circles of Life
+                </h1>
+                <p>
+                    See all of your files and folders as nested circles, reveal the structure of your directories.
+                </p>
+                <h2>Controls</h2>
+                <div class="controls-buttons">
+                    <input type="file" id="jsonFileLoad" accept=".json">
+                    <button id="loadJsonFileButton">
+                        Load Summary
+                    </button>
+                    <button id="zoomOutButton">
+                        Reset Zoom
+                    </button>
+                    <button id="goUpButton">
+                        Go Up
+                    </button>
+                </div> 
+                
+                <div class="input-group">
+                    <label for="sortBy" class="form-label">
+                        Sort By:
+                    </label>
+                    <select id="sortBy">
+                    <option value="size">File size</option>
+                    <option value="reverseSize">File Size Reverse</option>
+                    <option value="name">File Name</option>
+                    </select>
+                </div> 
+                <div class="slidecontainer">
+                        <label for="paddingFactor" class="form-label">
+                            Padding:
+                            <input type="range" min="0" max="3600" value="0" class="slider" id="paddingFactor">
+                        </label>
+                        <label for="ignoreSize" class="form-label">
+                            Use file size:
+                            <input type="range" min="1" max="100" value="100" class="slider" id="ignoreSize" value="Yes">
+                            <label for="ignore">100%</label><br>
+                        </label>
+                        <label for="hideLabels">
+                            Hide labels
+                        </label>
+                        <input type="checkbox" id="hideLabels" value="1">
+                    </div>
+                     <div class="input-group">
+                         <button id="exportPngButton" class="py-2 px-4">
+                         Export PNG
+                        </button>
+                    </div>
+
+                <div class="input-group">    
+                    <label class="form-label">
+                        Search:
+                    </label>
+                    <input type="text" id="searchInput" placeholder="Search...">
+                    <p class="detail-item text-sm">
+                        <strong>Results:</strong> <span id="searchCount"></span>
+                    </p>
+                    <p class="detail-item text-sm">
+                        <strong>Total:</strong> <span id="searchSummary"></span>
+                    </p>
+                </div>
+                
+                </div>
+            
+            <div id="visualizationColumn" class="visualization-column">
+                <canvas id="lifeViz"></canvas>
+                <p class="detail-item">
+                <strong>Breadcrumbs:</strong> <span id="breadcrumbs"></span>
+            </p>  
+                    <p class="detail-item">
+                        <strong>Copyable Path:</strong> <p id="detailPath"></p>
+                    </p>
+            </div>
+            <div class="details-column">
+                <h2>Details</h2>
+                
+                <div class="input-group">
+                    <p class="text-xl font-semibold text-gray-800 mb-2">
+                        <strong>Main Summary:</strong> 
+                    </p>
+                    <span id="folderSummary"></span>
+                </div> 
+                <div id="selectedItemDetails" class="hidden">
+                    <h3>
+                        Selected Item:
+                    </h3>
+                    <p class="detail-item">
+                        <strong>Name:</strong> <span id="detailName"></span>
+                    </p>
+                    <p class="detail-item">
+                        <strong>Extinct:</strong> <span id="detailExtinct"></span>
+                    </p>
+                    <p class="detail-item">
+                        <strong>Sub-items:</strong> <span id="detailChildren"></span>
+                    </p>
+                    <p class="detail-item">
+                        <strong>Size:</strong> <span id="detailSize"></span>
+                    </p>
+                    <p class="detail-item">
+                        <strong>Last Modified:</strong>
+                        <span id="detailLastModified"></span>
+                    </p>
+                </div>
+                <div id="initialDetailsPrompt">
+                    <p>
+                        Click on any circle in the visualization to see its details here.
+                    </p>
+                </div>
+                
+            <h2 class="mt-4">Colour Legend</h2>
+                <div class="input-group">
+                    <label for="colorBy" class="form-label">
+                        Colour By:
+                    </label>
+                    <select id="colorBy">
+                        <option value="depth">Depth</option>
+                        <option value="extinct">Extinct</option>
+                        <option value="idNumber">Size</option>
+                        <option value="date">Last Modified Date</option>
+                    </select>
+                </div>
+                <div id="extinctLegendItems">
+                    </div>
+                <div id="dateLegendItems" class="hidden">
+                    <h4>Last Modified Date</h4>
+                    <div id="dateLegendBar" class="legend-bar">
+                    </div>
+                    <div class="legend-labels">
+                        <span id="minDateLabel"></span>
+                        <span id="maxDateLabel"></span>
+                    </div>
+                </div>
+                <div id="depthLegendItems" class="hidden">
+                    <h4>Depth</h4>
+                    <div id="depthLegendBar" class="legend-bar">
+                    </div>
+                    <div class="legend-labels">
+                        <span id="minDateLabel"></span>
+                        <span id="maxDateLabel"></span>
+                    </div>
+                </div>
+                <div id="idNumberLegendItems" class="hidden">
+                    <h4>Folder Size</h4>
+                    <div id="idNumberLegendBar" class="legend-bar"></div>
+                    <div class="legend-labels">
+                        <span id="minidNumberLabel">Smallest</span>
+                        <span id="maxidNumberLabel">Largest</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom-grid">
+            <div class="search-results-box">
+                <h2>Search Results</h2>
+                <div id="searchItems">
+                </div>
+                <div id="initialSearchPrompt">
+                <p>
+                        Enter a search term to see up to 20 of the results listed here.
+                    </p>
+                </div>
+            </div>
+            <div class="guide-box">
+                <h2>Guide</h2>
+                <p>
+                    This is a demonstration of alternative visualisation technique for the tree of life. Other examples include branching trees, tree maps, and sunburst diagrams.
+                    These nested circles can be used to represent any arbitrarily complex hierarchy structure.
+
+                </p>
+                <ul class="list-disc list-inside">
+                    <li>Larger circles or nested circles represent kingdoms, phylum, class, order, family or genus.</li>
+                    <li>Smaller, innermost circles represent individual species.</li>
+                </ul>
+                <p> 
+                    Created by Gwen Protheroe 2025. 
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <div id="tooltip" class="tooltip"></div>
+	<script src="Circles of life.js"></script>
+</body>
+
+</html>
