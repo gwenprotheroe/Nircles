@@ -870,7 +870,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     //if (node === currentZoomNode || (currentZoomNode === null && i === pathNodes.length - 1)) {
                     //    span.classList.add('current');
                     //} else {
-                        span.addEventListener('click', () => zoomToNode(node));
+                       span.addEventListener('click', () => zoomToNode(node));
                     //}
                     breadcrumbsDiv.appendChild(span);
 
@@ -934,7 +934,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (hoveredNode) {
                         tooltip.style("opacity", 0.75)
                             .html(`<strong> Item: </strong>${hoveredNode.data.name}
-                            <br/><strong>Parent Folder: </strong>${hoveredNode.parent.data.name}
+                            <br/><strong>Parent Folder: </strong>${hoveredNode.parent ? hoveredNode.parent.data.name: ''}
                             `)
                             .style("left", (event.pageX + 40) + "px")
                             .style("top", (event.pageY - 28) + "px");
@@ -990,7 +990,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         detailChildren.textContent = "";
                     }
                     detailSize.textContent = formatBytes(selectedNode.value);
-                    detailLastModified.textContent = selectedNode.data.last_modified_iso ? new Date(selectedNode.data.last_modified_unix * 1000).toLocaleString() : "N/A";
+                    detailLastModified.textContent = selectedNode.data.last_modified_iso ? new Date(selectedNode.data.last_modified_unix * 1000).toLocaleString("en-GB") : "N/A";
                     if (selectedNode.data.children){
                         detailPath.textContent = selectedNode.data.path;
                     } else {
@@ -1128,7 +1128,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 processAndRenderVisualization(rootNodeData);
                                 folderSummary = data.length();
                                 // Reset zoom after resize to fit new dimensions
-                                resetZoom();
+                                zoomToNode(currentZoomNode);
                             } else {
                                 ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear if no data
                             }
