@@ -8,118 +8,197 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto" rel="stylesheet">
     <style>
-        /* CSS Variables (from Tailwind config) */
         #palette {
             --Orange: #ED6631;
             --pebble: #E2DDDB;
             --fossil: #C9C4BD;
             --fog: #F2EFEC;
         }
-        
-        *{
-          margin: 2px;
-          padding: 0px;
+
+        * {
+            gap: 2px;
+            margin: 2px;
+            padding: 0px;
         }
-        
+
         /* Base Styles */
         body {
             font-family: 'Roboto', sans-serif;
             background-color: var(--fossil, #C9C4BD);
             min-height: 100vh;
             margin: 0;
-            padding: 8px; /* p-2 */
+            padding: 8px;
             display: flex;
             flex-direction: column;
-            align-items: center; /* items-center */
-            justify-content: center; /* justify-center */
+            align-items: center;
+            justify-content:center;
             box-sizing: border-box;
         }
-        
+
         .container-wrapper {
             background-color: var(--pebble, #E2DDDB);
-            margin-left: auto; /* mx-auto */
-            margin-right: auto; /* mx-auto */
-            border-radius: 0.5rem; /* rounded-lg */
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-xl */
-            padding: 0px; 
-            max-width: 100%; /* max-w-screen */
-            width: 100%; /* w-screen */
-            display: flex; /* flex-auto */
-            flex-direction: column; /* flex-col */
+            margin-left: auto;
+            margin-right: auto;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            padding: 2px;
+            max-width: 100%;
+            width: 100%;
+            display: flex;
+            flex-direction: row;
             flex-grow: 1;
         }
 
         /* Grid Layout */
         .main-grid {
-            display: grid;
-            grid-template-columns: 1fr; /* col-span-1 */
-            gap: 8px; /* gap-2 */
-            margin-bottom: 8px; /* mb-2 */
-            flex-direction: column-reverse;
-        }
-        @media (min-width: 768px) { /* md: */
-            .main-grid {
-                grid-template-columns: repeat(6, 1fr); /* md:grid-cols-6 */
-                flex-direction: row-reverse; /* flex-row-reverse */
-            }
+            display: flex;
+            padding: 2px;
+            margin-bottom: 8px;
+            flex-direction: column;
         }
 
         /* Column Styles */
-        .controls-column, .details-column {
-            grid-column: span 1 / span 1;
+        .controls-column,
+        .details-column {
+            /* grid-column: span 1 / span 1; */
+            width: 250px;
+            min-width: 100px;
             background-color: var(--fog, #F2EFEC);
-            padding: 4px; 
-            border-radius: 0.5rem; 
+            padding: 4px;
+            border-radius: 0.5rem;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
-        @media (min-width: 768px) {
-            .visualization-column {
-                grid-column: span 4 / span 4;
-                display: flex;            
+
+        .title-column {
+            /* grid-column: span 1 / span 1; */
+            width: 225px;
+            max-width: 350px;
+            background-color: var(--fog, #F2EFEC);
+            padding: 4px;
+            flex-direction: row;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Visualization Area */
+        #visualizationColumn {
+            flex-grow: 1;
+            width: auto;
+            height: auto;
+            padding: 0px;
+            max-width: calc(75vh - 40px);
+            max-height: calc(75vw - 40px);
+            aspect-ratio: 1;
+        }
+
+        #folderViz {
+            background-color: var(--white, #FFFFFF);
+            border-radius: 8px;
+            box-shadow: 0 6px 6px 0 rgba(0, 0, 0, 0.1);
+            cursor: crosshair;
+            display: block;
+            width: 100%;
+        }
+
+        #folderViz.grabbing {
+            cursor: grab;
+        }
+
+        /* Bottom Row */
+        .bottom-grid {
+            display: flex;
+            flex-direction: row;
+            grid-template-columns: 1fr;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .results-box {
+            grid-column: span 1 / span 1;
+            background-color: var(--fog, #F2EFEC);
+            padding: 6px;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        @media (max-width: 768px) {
+            .main-grid {
+                /*grid-template-columns: repeat(6, 1fr);  */
+                flex-direction: column;
+            }
+
+            .container-wrapper {
+                flex-direction: column;
+            }
+
+            .visualization-area {
+                display: flex;
+                aspect-ratio: 1;
+                flex-grow: 1;
                 flex-direction: column;
                 justify-content: space-between;
-                align-items: left;
-                border-radius: 0.5rem; 
+                align-items: center;
+                border-radius: 0.5rem;
                 min-width: 100%;
+            }
+
+            /* #visualizationColumn {
+                order: -1;
+            } */
+
+            .bottom-grid {
+                grid-template-columns: repeat(3, 1fr);
+                /* md:grid-cols-3 */
+            }
+
+            .results-box {
+                grid-column: span 2 / span 2;
             }
         }
 
         /* Typography */
         h1 {
-            font-size: 2.25rem; /* text-4xl */
-            font-weight: 800; /* font-extrabold */
-            text-align: center; /* text-center */
-            color: #1f2937; /* text-gray-800 */
-            margin-bottom: 1.5rem; /* mb-6 */
+            font-size: 2.25rem;
+            font-weight: 800;
+            text-align: center;
+            color: #1f2937;
+            margin-bottom: 1.5rem;
         }
+
         h2 {
-            font-size: 1.5rem; /* text-2xl */
-            font-weight: 700; /* font-bold */
-            color: #374151; /* text-gray-700 */
-            margin-bottom: 1rem; /* mb-4 */
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 0.25rem;
         }
+
         h3 {
-             font-size: 1.25rem; /* text-xl */
-            font-weight: 600; /* font-semibold */
-            color: #1f2937; /* text-gray-800 */
-            margin-bottom: 0.5rem; /* mb-2 */
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
         }
+
         h4 {
-             font-size: 1rem; /* text-xl */
-            font-weight: 600; /* font-semibold */
-            color: #374151; /* text-gray-700 */
-            margin-bottom: 0.5rem; /* mb-2 */
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
         }
+
         p {
-            color: #4b5563; /* text-gray-600 */
-            margin-bottom: 1rem; /* mb-4 */
+            color: #4b5563;
+            margin-bottom: 1rem;
         }
+
         .text-sm {
             font-size: 0.875rem;
         }
+
         .text-xs {
             font-size: 0.75rem;
         }
+
         .text-gray-700 {
             color: #374151;
         }
@@ -127,105 +206,117 @@
         /* Controls Section */
         .controls-buttons {
             display: flex;
-            flex-wrap: wrap; /* flex-wrap */
-            justify-content: space-between; /* justify-between */
-            width: 100%; /* w-full */
-            margin-bottom: 1rem; /* mb-4 */
-            gap: 8px; /* gap-2 */
+            flex-wrap: wrap;
+            justify-content: space-between;
+            width: 50%;
+            margin-bottom: 1rem;
+            gap: 8px;
         }
-        
+
         /* Buttons */
         button {
             background-color: var(--Orange, #ED6631);
-            color: white; /* text-white */
-            font-weight: 700; /* font-bold */
-            padding: 8px 16px; /* py-2 px-4 */
-            border-radius: 0.5rem; /* rounded-lg */
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06); /* shadow-md */
-            transition: all 0.3s ease-in-out; /* transition duration-300 ease-in-out */
+            color: white;
+            font-weight: 700;
+            padding: 8px 16px;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease-in-out;
             border: none;
         }
+
         button:hover {
-            background-color: black; /* hover:bg-[#000000] */
-            transform: scale(1.05); /* transform hover:scale-105 */
+            background-color: black;
+            /* hover:bg-[#000000] */
+            transform: scale(1.05);
+            /* transform hover:scale-105 */
         }
+
         button:focus {
             outline: none;
-            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5); /* focus:ring-2 focus:ring-black-500 focus:ring-opacity-75 */
+            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5);
+            /* focus:ring-2 focus:ring-black-500 focus:ring-opacity-75 */
         }
 
         /* Input/Select Styles */
         input[type=file] {
-            display: none; /* hidden */
+            display: none;
         }
+
         .input-group {
-            margin-bottom: 1rem; /* mb-4 */
+            margin-bottom: 0.5rem;
         }
+
         .form-label {
             display: block;
-            color: #374151; /* text-gray-700 */
-            font-size: 0.875rem; /* text-sm */
-            font-weight: 700; /* font-bold */
-            margin-bottom: 0.5rem; /* mb-2 */
+            width: 50%;
+            color: #374151;
+            /* text-gray-700 */
+            font-size: 0.875rem;
+            /* text-sm */
+            font-weight: 700;
+            /* font-bold */
+            margin-bottom: 0.5rem;
+            /* mb-2 */
         }
-        select, input[type=text] {
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
-            border: 1px solid #d1d5db; /* border */
-            border-radius: 0.5rem; /* rounded-lg */
-            width: 100%; /* w-full */
-            padding: 8px 12px; /* py-2 px-3 */
-            color: #374151; /* text-gray-700 */
-            line-height: 1.25; /* leading-tight */
+
+        select,
+        input[type=text] {
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            /* shadow-sm */
+            border: 1px solid #d1d5db;
+            /* border */
+            border-radius: 0.5rem;
+            /* rounded-lg */
+            width: 100%;
+            /* w-full */
+            padding: 8px 12px;
+            /* py-2 px-3 */
+            color: #374151;
+            /* text-gray-700 */
+            line-height: 1.25;
+            /* leading-tight */
             box-sizing: border-box;
         }
-        select:focus, input[type=text]:focus {
+
+        select:focus,
+        input[type=text]:focus {
             outline: none;
-            box-shadow: 0 0 0 2px rgba(237, 102, 49, 0.5); /* focus:ring-2 focus:ring-[#ED6631] */
-            border-color: transparent; /* focus:border-transparent */
+            box-shadow: 0 0 0 2px rgba(237, 102, 49, 0.5);
+            /* focus:ring-2 focus:ring-[#ED6631] */
+            border-color: transparent;
+            /* focus:border-transparent */
         }
+
         input[type=checkbox] {
             accent-color: black;
         }
+
         input[type=range] {
             accent-color: var(--Orange, #ED6631);
         }
-        #searchInput {
-            max-width: 100%; /* max-w-xs - adjusted for full column width */
-            margin-bottom: 0.5rem; /* mb-2 */
-            flex-grow: 1; /* flex-grow */
-        }
 
-        /* Visualization Area */
-        #visualizationColumn {
-            grid-column: span 1 / span 1;
-            /* Default to full width on mobile/small screen */
-        }
-        @media (min-width: 768px) {
-            #visualizationColumn {
-                grid-column: span 4 / span 4;
-            }
-        }
-        #folderViz {
-            background-color: var(--white, #FFFFFF);
-            border-radius: 0.5rem; /* rounded-lg */
-            box-shadow: 0 6px 6px 0 rgba(0, 0, 0, 0.1);
-            cursor: crosshair;
-            display: block;
-            width: 100%;
-            /* Aspect ratio is handled in JS by calculating height based on width */
-        }
-        #folderViz.grabbing {
-            cursor: grab;
+        #searchInput {
+            max-width: 100%;
+            /* max-w-xs - adjusted for full column width */
+            margin-bottom: 0.5rem;
+            /* mb-2 */
+            flex-grow: 1;
+            /* flex-grow */
         }
 
         /* Details and Search Results */
-        .detail-item, .summary-item {
-            color: #374151; /* text-gray-700 */
-            margin-bottom: 4px; /* mb-1 */
+        .detail-item,
+        .summary-item {
+            color: #374151;
+            margin-bottom: 4px;
         }
+
         #selectedItemDetails {
-            color: #4b5563; /* text-gray-600 */
+            color: #4b5563;
+            /* text-gray-600 */
         }
+
         #initialDetailsPrompt {
             color: #4b5563;
             flex-grow: 1;
@@ -234,7 +325,7 @@
             justify-content: center;
             text-align: center;
         }
-        
+
         /* Breadcrumbs */
         .breadcrumb-item {
             cursor: pointer;
@@ -244,9 +335,11 @@
             justify-content: left;
             text-align: left;
         }
+
         .breadcrumb-item:hover {
             text-decoration: underline;
         }
+
         .breadcrumb-item.current {
             color: #585858;
             cursor: default;
@@ -254,71 +347,66 @@
         }
 
         /* Color Legend */
-        #typeLegendItems, #searchItems {
+        #typeLegendItems,
+        #searchItems {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px 4px; /* gap-x-2 gap-y-1 */
-            font-size: 0.875rem; /* text-sm */
+            gap: 8px 4px;
+            /* gap-x-2 gap-y-1 */
+            font-size: 0.875rem;
+            /* text-sm */
         }
-        #typeLegendItems > div, #searchItems > div {
+
+        #typeLegendItems>div,
+        #searchItems>div {
             display: flex;
             align-items: center;
-            gap: 8px; /* space-x-2 */
+            gap: 8px;
+            /* space-x-2 */
         }
-        #dateLegendItems, #depthLegendItems, #fileSizeLegendItems {
-            margin-top: 8px; /* mt-2 */
+
+        #dateLegendItems,
+        #depthLegendItems,
+        #fileSizeLegendItems {
+            margin-top: 8px;
+            /* mt-2 */
         }
+
         .legend-bar {
-            height: 1rem; /* h-4 */
-            width: 100%; /* w-full */
-            border-radius: 9999px; /* rounded-full */
+            height: 1rem;
+            /* h-4 */
+            width: 100%;
+            /* w-full */
+            border-radius: 9999px;
+            /* rounded-full */
         }
+
         .legend-labels {
             display: flex;
             justify-content: space-between;
-            font-size: 0.75rem; /* text-xs */
-            margin-top: 4px; /* mt-1 */
+            font-size: 0.75rem;
+            /* text-xs */
+            margin-top: 4px;
+            /* mt-1 */
         }
+
         #dateLegendBar {
             background: linear-gradient(to left, var(--fog, #F2EFEC), #2B2A28);
         }
+
         #depthLegendBar {
-            background: linear-gradient(to right, #98edfa, #94f787,#f4c576, #f26e6e, #6857eb);
-        }
-        #fileSizeLegendBar {
-            background: linear-gradient(to left, rgb(226, 221, 219), rgb(0, 0, 0));
+            background: linear-gradient(to right, #98edfa, #94f787, #f4c576, #f26e6e, #6857eb);
         }
 
-        /* Bottom Row */
-        .bottom-grid {
-            display: grid;
-            grid-template-columns: 1fr; /* col-span-1 */
-            gap: 8px; /* gap-2 */
-            margin-bottom: 8px; /* mb-2 */
-        }
-        @media (min-width: 768px) {
-            .bottom-grid {
-                grid-template-columns: repeat(3, 1fr); /* md:grid-cols-3 */
-            }
-        }
-        .search-results-box {
-            grid-column: span 1 / span 1;
-            background-color: var(--fog, #F2EFEC);
-            padding: 8px;
-            border-radius: 0.5rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-        @media (min-width: 768px) {
-            .search-results-box {
-                grid-column: span 2 / span 2;
-            }
+        #fileSizeLegendBar {
+            background: linear-gradient(to left, rgb(226, 221, 219), rgb(0, 0, 0));
         }
 
         .guide-box {
             grid-column: span 1 / span 1;
             background-color: var(--fog, #F2EFEC);
             border-radius: 0.5rem;
-            padding: 0px; 
+            padding: 0px;
             border-radius: 0.5rem;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
             /* max-width: 100%; max-w-7xl - adjusted */
@@ -327,14 +415,14 @@
         }
 
         /* D3 Canvas Text Styles */
-        text { 
-            font-family: 'Roboto', sans-serif; 
+        text {
+            font-family: 'Roboto', sans-serif;
             fill: black;
-            stroke: white; 
-            stroke-width: 3; 
-            font-size: 16px; 
+            stroke: white;
+            stroke-width: 3;
+            font-size: 16px;
             paint-order: stroke fill;
-            text-anchor: middle; 
+            text-anchor: middle;
         }
 
         /* Tooltip */
@@ -361,7 +449,8 @@
         .message-box-overlay {
             position: fixed;
             inset: 0;
-            background-color: rgba(201, 196, 189, 0.5); /* #C9C4BD with 50% opacity */
+            background-color: rgba(201, 196, 189, 0.5);
+            /* #C9C4BD with 50% opacity */
             display: flex;
             align-items: center;
             justify-content: center;
@@ -377,91 +466,120 @@
             width: 100%;
             text-align: center;
         }
+
         .message-box-content button {
-            background-color: #2563eb; /* blue-600 */
+            background-color: #2563eb;
+            /* blue-600 */
         }
+
         .message-box-content button:hover {
-            background-color: #1d4ed8; /* blue-700 */
+            background-color: #1d4ed8;
+            /* blue-700 */
         }
 
         /* Utility classes replacement */
-        .flex { display: flex; }
-        .flex-col { flex-direction: column; }
-        .flex-wrap { flex-wrap: wrap; }
-        .justify-between { justify-content: space-between; }
-        .items-center { align-items: center; }
-        .space-x-2 > * + * { margin-left: 0.5rem; }
-        .list-disc { list-style-type: disc; }
-        .list-inside { list-style-position: inside; }
-        .hidden { display: none !important; }
-        .rounded-full { border-radius: 9999px; }
-        .w-4 { width: 1rem; }
-        .h-4 { height: 1rem; }
-        .mb-2 { margin-bottom: 0.5rem; }
-        .mb-4 { margin-bottom: 1rem; }
-        .mt-4 { margin-top: 1rem; }
-        .mt-2 { margin-top: 0.5rem; }
-        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
-        .px-4 { padding-left: 1rem; padding-right: 1rem; }
+        .flex {
+            display: flex;
+        }
+
+        .flex-col {
+            flex-direction: column;
+        }
+
+        .flex-wrap {
+            flex-wrap: wrap;
+        }
+
+        .justify-between {
+            justify-content: space-between;
+        }
+
+        .items-center {
+            align-items: center;
+        }
+
+        .space-x-2>*+* {
+            margin-left: 0.5rem;
+        }
+
+        .list-disc {
+            list-style-type: disc;
+        }
+
+        .list-inside {
+            list-style-position: inside;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .rounded-full {
+            border-radius: 9999px;
+        }
+
+        .w-4 {
+            width: 1rem;
+        }
+
+        .h-4 {
+            height: 1rem;
+        }
+
+        .mb-2 {
+            margin-bottom: 0.5rem;
+        }
+
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+
+        .mt-4 {
+            margin-top: 1rem;
+        }
+
+        .mt-2 {
+            margin-top: 0.5rem;
+        }
+
+        .py-2 {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+
+        .px-4 {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
     </style>
 </head>
 
 <body class="min-w-screen">
-    <div class="container-wrapper">
-        <div class="main-grid">
-            <div class="controls-column">
-                <h1>
-                    Nircles
-                </h1>
-                <p>
-                    See all of your files and folders as nested circles, reveal the structure of your directories.
-                </p>
-                <h2>Controls</h2>
-                <div class="controls-buttons">
+    <div class="main-grid">
+        <div class="container-wrapper">
+            <div id="visualizationColumn" class="visualization-area">
+                <canvas id="folderViz"></canvas>
+            </div>
+            <div class="title-column">
+                    <h1>
+                        Nircles
+                    </h1><span>
+                        <!-- <p> -->
+                        See all of your files and folders as nested circles, reveal the structure of your
+                        directories.
+                        <!-- </p> -->
+                    </span>
                     <input type="file" id="jsonFileLoad" accept=".json">
                     <button id="loadJsonFileButton">
                         Load Summary
                     </button>
-                    <button id="zoomOutButton">
-                        Reset Zoom
-                    </button>
-                    <button id="goUpButton">
-                        Go Up
-                    </button>
-                </div> 
-                
+                <div>
+                    <p class="text-xl font-semibold text-gray-800 mb-2">
+                        <strong>Summary Details:</strong>
+                        <span id="folderSummary"></span>
+                    </p>
+                </div>
                 <div class="input-group">
-                    <label for="sortBy" class="form-label">
-                        Sort By:
-                    </label>
-                    <select id="sortBy">
-                    <option value="size">File size</option>
-                    <option value="reverseSize">File Size Reverse</option>
-                    <option value="name">File Name</option>
-                    </select>
-                </div> 
-                <div class="slidecontainer">
-                        <label for="paddingFactor" class="form-label">
-                            Padding:
-                            <input type="range" min="0" max="3600" value="100" class="slider" id="paddingFactor">
-                        </label>
-                        <label for="ignoreSize" class="form-label">
-                            Use file size:
-                            <input type="range" min="1" max="100" value="100" class="slider" id="ignoreSize" value="Yes">
-                            <label for="ignore">100%</label><br>
-                        </label>
-                        <label for="hideLabels">
-                            Hide labels
-                        </label>
-                        <input type="checkbox" id="hideLabels" value="Yes">
-                    </div>
-                     <div class="input-group">
-                         <button id="exportPngButton" class="py-2 px-4">
-                         Export PNG
-                        </button>
-                    </div>
-
-                <div class="input-group">    
                     <label class="form-label">
                         Search:
                     </label>
@@ -473,31 +591,84 @@
                         <strong>Total:</strong> <span id="searchSummary"></span>
                     </p>
                 </div>
-                
-                </div>
-            
-            <div id="visualizationColumn" class="visualization-column">
-                <canvas id="folderViz"></canvas>
-                <p class="detail-item">
-                <strong>Breadcrumbs:</strong> <span id="breadcrumbs"></span>
-            </p>  
-                    <p class="detail-item">
-                        <strong>Copyable Path:</strong> <span id="detailPath"></span>
-                    </p>
             </div>
+
+            <div class="controls-column">
+                <h2>View Controls</h2>
+                    
+                    <div class="input-group">
+                        <label for="colorBy" class="form-label">
+                            Colour By:
+                        </label>
+                        <select id="colorBy">
+                            <option value="depth">Depth</option>
+                            <option value="type">File Type</option>
+                            <option value="fileSize">Size</option>
+                            <option value="date">Last Modified Date</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="sortBy" class="form-label">
+                            Sort By:
+                        </label>
+                        <select id="sortBy">
+                            <option value="reverseSize">File size</option>
+                            <option value="size">File Size Reverse</option>
+                            <option value="name">File Name</option>
+                        </select>
+                    </div>
+                    <div class="slidecontainer">
+                        <label for="paddingFactor" class="form-label">
+                            Padding:
+                            <input type="range" min="0" max="3600" value="100" class="slider" id="paddingFactor">
+                        </label>
+                        <label for="ignoreSize" class="form-label">
+                            Use file size:
+                            <input type="range" min="1" max="100" value="100" class="slider" id="ignoreSize"
+                                value="Yes">
+                            <label for="ignore">100%</label><br>
+                        </label>
+                        <label for="hideLabels">
+                            Hide labels
+                        </label>
+                        <input type="checkbox" id="hideLabels" value="Yes">
+                    </div>
+                    <div class="input-group">
+                    </div>
+                    <div class="controls-buttons">
+                        <button id="zoomOutButton">
+                            Reset Zoom
+                        </button>
+                        <button id="goUpButton">
+                            Go Up
+                        </button>
+                        <button id="exportPngButton" class="py-2 px-4">
+                            Export PNG
+                        </button>
+                    </div>
+            </div>
+        </div>
+
+    </div>
+      
+    <div class="container-wrapper">
+        <div class="bottom-grid">
+            
             <div class="details-column">
                 <h2>Details</h2>
-                
-                <div class="input-group">
-                    <p class="text-xl font-semibold text-gray-800 mb-2">
-                        <strong>Main Summary:</strong> 
-                    </p>
-                    <span id="folderSummary"></span>
-                </div> 
                 <div id="selectedItemDetails" class="hidden">
                     <h3>
                         Selected Item:
                     </h3>
+                    <div>
+                        <p class="detail-item">
+                                                <strong>Breadcrumbs:</strong> <p id="breadcrumbs"></p>
+                                            </p>
+                                            <p class="detail-item">
+                                                <strong>Copyable Path:</strong>
+                                            <p id="detailPath"></p>
+                                            </p>
+                            </div>
                     <p class="detail-item">
                         <strong>Name:</strong> <span id="detailName"></span>
                     </p>
@@ -520,21 +691,11 @@
                         Click on any circle in the visualization to see its details here.
                     </p>
                 </div>
-                
-            <h2 class="mt-4">Colour Legend</h2>
-                <div class="input-group">
-                    <label for="colorBy" class="form-label">
-                        Colour By:
-                    </label>
-                    <select id="colorBy">
-                        <option value="depth">Depth</option>
-                        <option value="type">File Type</option>
-                        <option value="fileSize">Size</option>
-                        <option value="date">Last Modified Date</option>
-                    </select>
-                </div>
+            </div>
+            <div>
+                <h2 class="mt-4">Colour Legend</h2>
                 <div id="typeLegendItems">
-                    </div>
+                </div>
                 <div id="dateLegendItems" class="hidden">
                     <h4>Last Modified Date</h4>
                     <div id="dateLegendBar" class="legend-bar">
@@ -563,13 +724,17 @@
                 </div>
             </div>
         </div>
+    </div>
+  
+
+    <div class="container-wrapper">
         <div class="bottom-grid">
-            <div class="search-results-box">
+            <div class="results-box">
                 <h2>Search Results</h2>
                 <div id="searchItems">
                 </div>
                 <div id="initialSearchPrompt">
-                <p>
+                    <p>
                         Enter a search term to see up to 20 of the results listed here.
                     </p>
                 </div>
@@ -577,24 +742,24 @@
             <div class="guide-box">
                 <h2>Guide</h2>
                 <p>
-                    This is a demonstration of alternative folder visualisation techniques. Other examples include branching trees, tree maps, and sunburst diagrams.
+                    This is a demonstration of alternative folder visualisation techniques. Other examples include
+                    branching trees, tree maps, and sunburst diagrams.
                     These nested circles can be used to represent any arbitrarily complex hierarchy structure.
-                    
+
                 </p>
                 <ul class="list-disc list-inside">
                     <li>Larger circles or nested circles represent folders or directories.</li>
                     <li>Smaller, innermost circles represent individual files.</li>
                 </ul>
-                <p> 
-                    Created by Gwen Protheroe 2025. 
+                <p>
+                    Created by Gwen Protheroe 2025.
                 </p>
             </div>
         </div>
     </div>
-</div>
 
     <div id="tooltip" class="tooltip"></div>
-	<script src="NirclesScript.js"></script>
+    <script src="NirclesScript.js"></script>
 </body>
 
 </html>
