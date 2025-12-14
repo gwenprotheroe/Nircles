@@ -1,0 +1,90 @@
+{
+  "path": "C:\\Nircles",
+  "name": "Nircles",
+  "type": "folder",
+  "value": "1",
+  "children": [
+    {
+      "path": "C:\\Nircles",
+      "name": "Easy to find Report.doc",
+      "type": "doc",
+      "value": 1855117,
+      "last_modified_unix": 1765662475.8671482,
+      "last_modified_iso": "2025-12-13T21:47:55.867148"
+    },
+    {
+      "path": "C:\\Nircles\\Garbage",
+      "name": "Garbage",
+      "type": "folder",
+      "value": "1",
+      "children": [
+        {
+          "path": "C:\\Nircles\\Garbage\\Don't look here",
+          "name": "Don't look here",
+          "type": "folder",
+          "value": "1",
+          "last_modified_unix": 1765663957.5168998,
+          "last_modified_iso": "2025-12-13T22:12:37.516900",
+          "children": [
+            {
+              "path": "C:\\Nircles\\Garbage\\Don't look here\\Hidden Files",
+              "name": "Hidden Files",
+              "type": "folder",
+              "value": "1",
+              "last_modified_unix": 1765662574.5388806,
+              "last_modified_iso": "2025-12-13T21:49:34.538881",
+              "children": [
+                {
+                  "path": "C:\\Nircles\\Garbage\\Don't look here\\Hidden Files\\Nothing to see",
+                  "name": "Nothing to see",
+                  "type": "folder",
+                  "value": "1",
+                  "last_modified_unix": 1765664473.3706894,
+                  "last_modified_iso": "2025-12-13T22:21:13.370689",
+                  "children": [
+                    {
+                      "path": "C:\\Nircles\\Garbage\\Don't look here\\Hidden Files\\Nothing to see",
+                      "name": "Hidden Plans for World Domination.zip",
+                      "type": "zip",
+                      "value": 5565351,
+                      "last_modified_unix": 1765664462.503736,
+                      "last_modified_iso": "2025-12-13T22:21:02.503736"
+                    }
+                  ]
+                },
+                {
+                  "path": "C:\\Nircles\\Garbage\\Don't look here\\Hidden Files",
+                  "name": "Red Herring.txt",
+                  "type": "txt",
+                  "value": 1855117,
+                  "last_modified_unix": 1765662475.8671482,
+                  "last_modified_iso": "2025-12-13T21:47:55.867148"
+                }
+              ]
+            },
+            {
+              "path": "C:\\Nircles\\Garbage\\Don't look here",
+              "name": "Red Herring.zip",
+              "type": "zip",
+              "value": 1855117,
+              "last_modified_unix": 1765662475.8671482,
+              "last_modified_iso": "2025-12-13T21:47:55.867148"
+            }
+          ]
+        },
+        {
+          "path": "C:\\Nircles\\Garbage",
+          "name": "Red Herring.txt",
+          "type": "txt",
+          "value": 1855117,
+          "last_modified_unix": 1765662475.8671482,
+          "last_modified_iso": "2025-12-13T21:47:55.867148"
+        }
+      ],
+      "last_modified_unix": 1765664183.2257137,
+      "last_modified_iso": "2025-12-13T22:16:23.225714"
+    }
+  ],
+  "last_modified_unix": 1765664185.9958615,
+  "last_modified_iso": "2025-12-13T22:16:25.995862"
+}

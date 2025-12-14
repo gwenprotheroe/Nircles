@@ -15,24 +15,49 @@
             --fog: #F2EFEC;
         }
 
+        .main-grid {
+            display: grid;
+            flex-direction: column;
+            background-color: var(--pebble, #E2DDDB);
+            box-sizing: border-box;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(1, 1fr);
+            grid-column-gap: 4px;
+            grid-row-gap: 8px;
+        }
+
+        .visualization-area {
+            grid-area: 1 / 1 / 1 / 3;
+        }
+
+        .title-column {
+            grid-area: 1 / 3 / 1 / 4;
+        }
+
+        .controls-column {
+            grid-area: 1 / 5 / 1 / 6;
+        }
+
+        .detail-item {
+            grid-area: 1 / 4 / 1 / 5;
+        }
+
         * {
-            gap: 2px;
+            gap: 4px;
             margin: 2px;
             padding: 0px;
         }
 
-        /* Base Styles */
         body {
             font-family: 'Roboto', sans-serif;
             background-color: var(--fossil, #C9C4BD);
-            min-height: 100vh;
-            margin: 0;
-            padding: 8px;
-            display: flex;
+            /* min-height: 100vh; */
+            /* margin: 0; */
+            /* display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content:center;
-            box-sizing: border-box;
+            justify-content: center;
+            box-sizing: border-box; */
         }
 
         .container-wrapper {
@@ -50,35 +75,41 @@
         }
 
         /* Grid Layout */
-        .main-grid {
+        /* .main-grid {
             display: flex;
             padding: 2px;
             margin-bottom: 8px;
             flex-direction: column;
-        }
+        } */
 
         /* Column Styles */
-        .controls-column,
-        .details-column {
-            /* grid-column: span 1 / span 1; */
+        /* .controls-column {
             width: 250px;
             min-width: 100px;
             background-color: var(--fog, #F2EFEC);
             padding: 4px;
             border-radius: 0.5rem;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
+        } */
 
-        .title-column {
-            /* grid-column: span 1 / span 1; */
+        /* .details-column {
+            max-width: 50pc;
+            min-width: 100px;
+            background-color: var(--fog, #F2EFEC);
+            padding: 4px;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        } */
+
+        /* .title-column {
             width: 225px;
             max-width: 350px;
             background-color: var(--fog, #F2EFEC);
-            padding: 4px;
+            padding: 0px;
             flex-direction: row;
             border-radius: 0.5rem;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
+        } */
 
         /* Visualization Area */
         #visualizationColumn {
@@ -86,9 +117,10 @@
             width: auto;
             height: auto;
             padding: 0px;
-            max-width: calc(75vh - 40px);
-            max-height: calc(75vw - 40px);
-            aspect-ratio: 1;
+            /* min-width: 50pc;
+            max-width: calc(85vh - 40px);
+            max-height: calc(85vw - 40px);
+            aspect-ratio: 1; */
         }
 
         #folderViz {
@@ -97,7 +129,7 @@
             box-shadow: 0 6px 6px 0 rgba(0, 0, 0, 0.1);
             cursor: crosshair;
             display: block;
-            width: 100%;
+            /* width: 100%; */
         }
 
         #folderViz.grabbing {
@@ -106,15 +138,30 @@
 
         /* Bottom Row */
         .bottom-grid {
-            display: flex;
+            display: grid;
             flex-direction: row;
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(1, 1fr);
+            grid-column-gap: 4px;
+            grid-row-gap: 8px;
             gap: 6px;
             margin-bottom: 6px;
         }
 
+        .guide-box {
+            grid-column: span 1 / span 3;
+            background-color: var(--fog, #F2EFEC);
+            border-radius: 0.5rem;
+            padding: 0px;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            /* max-width: 100%; max-w-7xl - adjusted */
+            /* display: flex; */
+            /* flex-direction: column; */
+        }
+
         .results-box {
-            grid-column: span 1 / span 1;
+            grid-column: span 3 / span 2;
             background-color: var(--fog, #F2EFEC);
             padding: 6px;
             border-radius: 0.5rem;
@@ -123,7 +170,6 @@
 
         @media (max-width: 768px) {
             .main-grid {
-                /*grid-template-columns: repeat(6, 1fr);  */
                 flex-direction: column;
             }
 
@@ -142,13 +188,8 @@
                 min-width: 100%;
             }
 
-            /* #visualizationColumn {
-                order: -1;
-            } */
-
             .bottom-grid {
                 grid-template-columns: repeat(3, 1fr);
-                /* md:grid-cols-3 */
             }
 
             .results-box {
@@ -314,16 +355,6 @@
 
         #selectedItemDetails {
             color: #4b5563;
-            /* text-gray-600 */
-        }
-
-        #initialDetailsPrompt {
-            color: #4b5563;
-            flex-grow: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
         }
 
         /* Breadcrumbs */
@@ -400,18 +431,6 @@
 
         #fileSizeLegendBar {
             background: linear-gradient(to left, rgb(226, 221, 219), rgb(0, 0, 0));
-        }
-
-        .guide-box {
-            grid-column: span 1 / span 1;
-            background-color: var(--fog, #F2EFEC);
-            border-radius: 0.5rem;
-            padding: 0px;
-            border-radius: 0.5rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            /* max-width: 100%; max-w-7xl - adjusted */
-            /* display: flex; */
-            /* flex-direction: column; */
         }
 
         /* D3 Canvas Text Styles */
@@ -556,206 +575,211 @@
 
 <body class="min-w-screen">
     <div class="main-grid">
-        <div class="container-wrapper">
-            <div id="visualizationColumn" class="visualization-area">
-                <canvas id="folderViz"></canvas>
-            </div>
-            <div class="title-column">
-                    <h1>
-                        Nircles
-                    </h1><span>
-                        <!-- <p> -->
-                        See all of your files and folders as nested circles, reveal the structure of your
-                        directories.
-                        <!-- </p> -->
-                    </span>
-                    <input type="file" id="jsonFileLoad" accept=".json">
-                    <button id="loadJsonFileButton">
-                        Load Summary
-                    </button>
-                <div>
-                    <p class="text-xl font-semibold text-gray-800 mb-2">
-                        <strong>Summary Details:</strong>
-                        <span id="folderSummary"></span>
-                    </p>
-                </div>
-                <div class="input-group">
-                    <label class="form-label">
-                        Search:
-                    </label>
-                    <input type="text" id="searchInput" placeholder="Search...">
-                    <p class="detail-item text-sm">
-                        <strong>Results:</strong> <span id="searchCount"></span>
-                    </p>
-                    <p class="detail-item text-sm">
-                        <strong>Total:</strong> <span id="searchSummary"></span>
-                    </p>
-                </div>
-            </div>
-
-            <div class="controls-column">
-                <h2>View Controls</h2>
-                    
-                    <div class="input-group">
-                        <label for="colorBy" class="form-label">
-                            Colour By:
-                        </label>
-                        <select id="colorBy">
-                            <option value="depth">Depth</option>
-                            <option value="type">File Type</option>
-                            <option value="fileSize">Size</option>
-                            <option value="date">Last Modified Date</option>
-                        </select>
-                    </div>
-                    <div class="input-group">
-                        <label for="sortBy" class="form-label">
-                            Sort By:
-                        </label>
-                        <select id="sortBy">
-                            <option value="reverseSize">File size</option>
-                            <option value="size">File Size Reverse</option>
-                            <option value="name">File Name</option>
-                        </select>
-                    </div>
-                    <div class="slidecontainer">
-                        <label for="paddingFactor" class="form-label">
-                            Padding:
-                            <input type="range" min="0" max="3600" value="100" class="slider" id="paddingFactor">
-                        </label>
-                        <label for="ignoreSize" class="form-label">
-                            Use file size:
-                            <input type="range" min="1" max="100" value="100" class="slider" id="ignoreSize"
-                                value="Yes">
-                            <label for="ignore">100%</label><br>
-                        </label>
-                        <label for="hideLabels">
-                            Hide labels
-                        </label>
-                        <input type="checkbox" id="hideLabels" value="Yes">
-                    </div>
-                    <div class="input-group">
-                    </div>
-                    <div class="controls-buttons">
-                        <button id="zoomOutButton">
-                            Reset Zoom
-                        </button>
-                        <button id="goUpButton">
-                            Go Up
-                        </button>
-                        <button id="exportPngButton" class="py-2 px-4">
-                            Export PNG
-                        </button>
-                    </div>
+        <div id="visualizationColumn" class="visualization-area">
+            <canvas id="folderViz"></canvas>
+        </div>
+        <div class="title-column">
+            <h1>
+                Nircles
+            </h1><span>
+                <!-- <p> -->
+                See all of your files and folders as nested circles, reveal the structure of your
+                directories.
+                <!-- </p> -->
+            </span>
+            <input type="file" id="jsonFileLoad" accept=".json">
+            <button id="loadJsonFileButton">
+                Load Summary
+            </button>
+            <div class="input-group">
+                <label class="form-label">
+                    Search:
+                </label>
+                <input type="text" id="searchInput" placeholder="Search...">
+                <p class="detail-item text-sm">
+                    <strong>Results:</strong> <span id="searchCount"></span>
+                </p>
+                <p class="detail-item text-sm">
+                    <strong>Total:</strong> <span id="searchSummary"></span>
+                </p>
             </div>
         </div>
-
-    </div>
-      
-    <div class="container-wrapper">
-        <div class="bottom-grid">
-            
-            <div class="details-column">
-                <h2>Details</h2>
-                <div id="selectedItemDetails" class="hidden">
-                    <h3>
-                        Selected Item:
-                    </h3>
-                    <div>
-                        <p class="detail-item">
-                                                <strong>Breadcrumbs:</strong> <p id="breadcrumbs"></p>
-                                            </p>
-                                            <p class="detail-item">
-                                                <strong>Copyable Path:</strong>
-                                            <p id="detailPath"></p>
-                                            </p>
-                            </div>
-                    <p class="detail-item">
-                        <strong>Name:</strong> <span id="detailName"></span>
-                    </p>
-                    <p class="detail-item">
-                        <strong>Type:</strong> <span id="detailType"></span>
-                    </p>
-                    <p class="detail-item">
-                        <strong>Sub-items:</strong> <span id="detailChildren"></span>
-                    </p>
-                    <p class="detail-item">
-                        <strong>Size:</strong> <span id="detailSize"></span>
-                    </p>
-                    <p class="detail-item">
-                        <strong>Last Modified:</strong>
-                        <span id="detailLastModified"></span>
-                    </p>
-                </div>
-                <div id="initialDetailsPrompt">
-                    <p>
-                        Click on any circle in the visualization to see its details here.
-                    </p>
-                </div>
-            </div>
+        <div class="details-column">
+            <h3>Details</h3>
             <div>
-                <h2 class="mt-4">Colour Legend</h2>
-                <div id="typeLegendItems">
+                <p>
+                    <strong>Summary Details:</strong>
+                    <span id="folderSummary"></span>
+                </p>
+            </div>
+            <div id="hoveredItemDetails">
+                <h2>
+                    Hovered Item:
+                </h2>
+                <p class="detail-item">
+                    <strong>Name:</strong> <span id="detailHName"></span>
+                </p>
+                <p class="detail-item">
+                    <strong>Type:</strong> <span id="detailHType"></span>
+                </p>
+                <p class="detail-item">
+                    <strong>Sub-items:</strong> <span id="detailHChildren"></span>
+                </p>
+                <p class="detail-item">
+                    <strong>Size:</strong> <span id="detailHSize"></span>
+                </p>
+                <p class="detail-item">
+                    <strong>Last Modified:</strong>
+                    <span id="detailHLastModified"></span>
+                </p>
+            </div>
+            <div id="selectedItemDetails">
+                <h2>
+                    Selected Item:
+                </h2>
+                <p class="detail-item">
+                    <strong>Name:</strong> <span id="detailName"></span>
+                </p>
+                <p class="detail-item">
+                    <strong>Type:</strong> <span id="detailType"></span>
+                </p>
+                <p class="detail-item">
+                    <strong>Sub-items:</strong> <span id="detailChildren"></span>
+                </p>
+                <p class="detail-item">
+                    <strong>Size:</strong> <span id="detailSize"></span>
+                </p>
+                <p class="detail-item">
+                    <strong>Last Modified:</strong>
+                    <span id="detailLastModified"></span>
+                </p>
+            </div>
+        </div>
+        <div class="controls-column">
+            <h2>View Controls</h2>
+            <div class="input-group">
+                <label for="colorBy" class="form-label">
+                    Colour By:
+                </label>
+                <select id="colorBy">
+                    <option value="depth">Depth</option>
+                    <option value="type">File Type</option>
+                    <option value="fileSize">Size</option>
+                    <option value="date">Last Modified Date</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="sortBy" class="form-label">
+                    Sort By:
+                </label>
+                <select id="sortBy">
+                    <option value="reverseSize">File size</option>
+                    <option value="size">File Size Reverse</option>
+                    <option value="name">File Name</option>
+                </select>
+            </div>
+            <div class="slidecontainer">
+                <label for="paddingFactor" class="form-label">
+                    Padding:
+                    <input type="range" min="0" max="3600" value="100" class="slider" id="paddingFactor">
+                </label>
+                <label for="ignoreSize" class="form-label">
+                    Use file size:
+                    <input type="range" min="1" max="100" value="100" class="slider" id="ignoreSize" value="Yes">
+                    <label for="ignore">100%</label><br>
+                </label>
+                <label for="hideLabels">
+                    Hide labels
+                </label>
+                <input type="checkbox" id="hideLabels" value="Yes">
+            </div>
+            <div class="input-group">
+            </div>
+            <div class="controls-buttons">
+                <button id="zoomOutButton">
+                    Reset Zoom
+                </button>
+                <button id="goUpButton">
+                    Go Up
+                </button>
+                <button id="exportPngButton" class="py-2 px-4">
+                    Export PNG
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="results-box">
+            <strong>Breadcrumbs:</strong>
+            <span id="breadcrumbs"></span>
+        <div>
+            <strong>Copyable Path:</strong>
+        <div id="detailPath"></div>
+        </div>
+    </div>
+    <div class="bottom-grid">
+        <div>
+            <h2 class="mt-4">Colour Legend</h2>
+            <div id="typeLegendItems">
+            </div>
+            <div id="dateLegendItems" class="hidden">
+                <h4>Last Modified Date</h4>
+                <div id="dateLegendBar" class="legend-bar">
                 </div>
-                <div id="dateLegendItems" class="hidden">
-                    <h4>Last Modified Date</h4>
-                    <div id="dateLegendBar" class="legend-bar">
-                    </div>
-                    <div class="legend-labels">
-                        <span id="minDateLabel"></span>
-                        <span id="maxDateLabel"></span>
-                    </div>
+                <div class="legend-labels">
+                    <span id="minDateLabel"></span>
+                    <span id="maxDateLabel"></span>
                 </div>
-                <div id="depthLegendItems" class="hidden">
-                    <h4>Depth</h4>
-                    <div id="depthLegendBar" class="legend-bar">
-                    </div>
-                    <div class="legend-labels">
-                        <span id="minDateLabel"></span>
-                        <span id="maxDateLabel"></span>
-                    </div>
+            </div>
+            <div id="depthLegendItems" class="hidden">
+                <h4>Depth</h4>
+                <div id="depthLegendBar" class="legend-bar">
                 </div>
-                <div id="fileSizeLegendItems" class="hidden">
-                    <h4>Folder Size</h4>
-                    <div id="fileSizeLegendBar" class="legend-bar"></div>
-                    <div class="legend-labels">
-                        <span id="minFileSizeLabel">Smallest</span>
-                        <span id="maxFileSizeLabel">Largest</span>
-                    </div>
+                <div class="legend-labels">
+                    <span id="minDateLabel"></span>
+                    <span id="maxDateLabel"></span>
+                </div>
+            </div>
+            <div id="fileSizeLegendItems" class="hidden">
+                <h4>Folder Size</h4>
+                <div id="fileSizeLegendBar" class="legend-bar"></div>
+                <div class="legend-labels">
+                    <span id="minFileSizeLabel">Smallest</span>
+                    <span id="maxFileSizeLabel">Largest</span>
                 </div>
             </div>
         </div>
     </div>
-  
+    </div>
 
-    <div class="container-wrapper">
-        <div class="bottom-grid">
-            <div class="results-box">
-                <h2>Search Results</h2>
-                <div id="searchItems">
-                </div>
-                <div id="initialSearchPrompt">
-                    <p>
-                        Enter a search term to see up to 20 of the results listed here.
-                    </p>
-                </div>
+
+    <div class="bottom-grid">
+        <div class="guide-box">
+            <h2>Guide</h2>
+            <p>
+                This is a demonstration of alternative folder visualisation techniques. Other examples include
+                branching trees, tree maps, and sunburst diagrams.
+                These nested circles can be used to represent any arbitrarily complex hierarchy structure.
+
+            </p>
+            <ul class="list-disc list-inside">
+                <li>Larger circles or nested circles represent folders or directories.</li>
+                <li>Smaller, innermost circles represent individual files.</li>
+            </ul>
+            <p>
+                Copyright © Created by Gwen Protheroe 2025.
+            </p>
+        </div>
+        <div class="results-box">
+            <h2>Search Results</h2>
+            <div id="searchItems">
             </div>
-            <div class="guide-box">
-                <h2>Guide</h2>
+            <div id="initialSearchPrompt">
                 <p>
-                    This is a demonstration of alternative folder visualisation techniques. Other examples include
-                    branching trees, tree maps, and sunburst diagrams.
-                    These nested circles can be used to represent any arbitrarily complex hierarchy structure.
-
-                </p>
-                <ul class="list-disc list-inside">
-                    <li>Larger circles or nested circles represent folders or directories.</li>
-                    <li>Smaller, innermost circles represent individual files.</li>
-                </ul>
-                <p>
-                    Created by Gwen Protheroe 2025.
+                    Enter a search term to see up to 20 of the results listed here.
                 </p>
             </div>
         </div>
+
     </div>
 
     <div id="tooltip" class="tooltip"></div>

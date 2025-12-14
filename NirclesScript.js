@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const ctx = canvas.getContext("2d");
   const tooltip = d3.select("#tooltip");
   const selectedItemDetails = document.getElementById("selectedItemDetails");
+  const hoveredItemDetails = document.getElementById("hoveredItemDetails");
   const initialDetailsPrompt = document.getElementById("initialDetailsPrompt");
   const detailName = document.getElementById("detailName");
   const detailType = document.getElementById("detailType");
@@ -12,6 +13,12 @@ document.addEventListener("DOMContentLoaded", function () {
   const detailSize = document.getElementById("detailSize");
   const detailLastModified = document.getElementById("detailLastModified");
   const detailPath = document.getElementById("detailPath");
+  const detailHName = document.getElementById("detailHName");
+  const detailHType = document.getElementById("detailHType");
+  const detailHChildren = document.getElementById("detailHChildren");
+  const detailHSize = document.getElementById("detailHSize");
+  const detailHLastModified = document.getElementById("detailHLastModified");
+  const detailHPath = document.getElementById("detailHPath");
   const searchItems = document.getElementById("searchItems");
   const initialSearchPrompt = document.getElementById("initialSearchPrompt");
 
@@ -528,11 +535,14 @@ document.addEventListener("DOMContentLoaded", function () {
   /////////////        Draw                       //////////////////
   //////////////////////////////////////////////////////////////////
   // Function to process data and then draw
-    function processAndRenderVisualization(data) {
-        const maxSize = Math.min(visualizationColumn.offsetWidth, visualizationColumn.offsetHeight);
-        const containerWidth = maxSize; // visualizationColumn.offsetWidth;
+  function processAndRenderVisualization(data) {
+    const maxSize = Math.min(
+      visualizationColumn.offsetWidth,
+      visualizationColumn.offsetHeight
+    );
+    const containerWidth = maxSize; // visualizationColumn.offsetWidth;
     // Set canvas height relative to window height, capped by container width for square aspect
-        const containerHeight = maxSize;  //visualizationColumn.offsetHeight; // Math.min(containerWidth, window.innerHeight * 0.9);
+    const containerHeight = maxSize; //visualizationColumn.offsetHeight; // Math.min(containerWidth, window.innerHeight * 0.9);
 
     canvas.width = containerWidth;
     canvas.height = containerHeight;
@@ -701,10 +711,13 @@ document.addEventListener("DOMContentLoaded", function () {
       // Text visibility: only show if the node itself is the currentZoomNode,
       // or if its parent is the currentZoomNode, or if no node is zoomed (root view).
       const relSize = 2 * d.r * transform.k;
-      const isVisibleInZoom = (1.3 * Math.min(canvas.width, canvas.height) > relSize && relSize > 100); // Visible size range
-        const isSpecial = d.depth === 0  // Always show root
-        || d === currentZoomNode || d === hoveredNode // Show selected node or hovered node
-        || ( d.parent !== null && d.parent === currentZoomNode) // Show children of selected node
+      const isVisibleInZoom =
+        1.3 * Math.min(canvas.width, canvas.height) > relSize && relSize > 100; // Visible size range
+      const isSpecial =
+        d.depth === 0 || // Always show root
+        d === currentZoomNode ||
+        d === hoveredNode || // Show selected node or hovered node
+        (d.parent !== null && d.parent === currentZoomNode); // Show children of selected node
 
       if (!hideLabels.checked && isSpecial && isVisibleInZoom) {
         const text = d.data.name;
@@ -743,7 +756,11 @@ document.addEventListener("DOMContentLoaded", function () {
           // ctx.fillStyle = 'rgb(25,25,25)'
           // ctx.textAlign = 'center' // Ensure we draw in exact center
           // ctx.fillText(text, d.x, d.y);
-          if (d === currentZoomNode || d.parent === currentZoomNode || d === hoveredNode) {
+          if (
+            d === currentZoomNode ||
+            d.parent === currentZoomNode ||
+            d === hoveredNode
+          ) {
             drawCircularText(
               ctx,
               text,
@@ -1054,10 +1071,10 @@ document.addEventListener("DOMContentLoaded", function () {
   function exportCanvasAsPNG() {
     const dataURL = canvas.toDataURL("image/png");
     const a = document.createElement("a");
-      a.href = dataURL;
-      const imageName = new Date().toISOString().slice(0, 10);
-  
-    a.download = currentDataNodes[0].data.name + '-' + imageName + '.png';
+    a.href = dataURL;
+    const imageName = new Date().toISOString().slice(0, 10);
+
+    a.download = currentDataNodes[0].data.name + "-" + imageName + ".png";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1097,6 +1114,26 @@ document.addEventListener("DOMContentLoaded", function () {
       // <br/>Last Modified: ${hoveredNode.data.last_modified_iso ? new Date(hoveredNode.data.last_modified_unix * 1000).toLocaleDateString() : "N/A"}`)
 
       if (hoveredNode) {
+        detailHName.textContent = hoveredNode.data.name;
+        detailHType.textContent = hoveredNode.data.type || "Folder";
+        if (hoveredNode.data.children) {
+          detailHChildren.textContent =
+            hoveredNode.data.children.length + " Children";
+        } else {
+          detailHChildren.textContent = "";
+        }
+        detailHSize.textContent = formatBytes(hoveredNode.value);
+        detailHLastModified.textContent = hoveredNode.data.last_modified_iso
+          ? new Date(hoveredNode.data.last_modified_unix * 1000).toLocaleString(
+              "en-GB"
+            )
+          : "N/A";
+        if (hoveredNode.data.children) {
+          detailHPath.textContent = hoveredNode.data.path;
+        } else {
+          detailHPath.textContent =
+            hoveredNode.data.path + "\\" + hoveredNode.data.name;
+        }
         tooltip
           .style("opacity", 0.75)
           .html(
@@ -1111,17 +1148,25 @@ document.addEventListener("DOMContentLoaded", function () {
           .style("left", event.pageX + 40 + "px")
           .style("top", event.pageY - 28 + "px");
       } else {
+        foundNode = null;
+        detailHName.textContent = "";
+        detailHType.textContent = "";
+        detailHChildren.textContent = "";
+        detailHPath.textContent = "";
+        detailHLastModified.textContent = ' ';
+        detailHSize.textContent = ' ';
         tooltip.style("opacity", 0);
       }
+      drawVisualization(); // Redraw to remove selection highlight
     }
   });
-
+  
   // Event listener for mouse leaving canvas
   canvas.addEventListener("mouseout", function () {
     if (hoveredNode) {
       hoveredNode = null;
-      drawVisualization(); // Redraw to remove hover highlight
       tooltip.style("opacity", 0);
+      drawVisualization(); // Redraw to remove hover highlight
     }
   });
 
@@ -1149,10 +1194,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (clickedNode) {
       selectedNode = clickedNode; // Update selected node for details panel
       zoomToNode(clickedNode); // Zoom to the clicked node
-
-      // Display details in the third column
-      selectedItemDetails.classList.remove("hidden");
-      initialDetailsPrompt.classList.add("hidden");
 
       detailName.textContent = selectedNode.data.name;
       detailType.textContent = selectedNode.data.type || "Folder";
@@ -1183,8 +1224,6 @@ document.addEventListener("DOMContentLoaded", function () {
         selectedNode = null;
         drawVisualization(); // Redraw to remove selection highlight
       }
-      selectedItemDetails.classList.add("hidden");
-      initialDetailsPrompt.classList.remove("hidden");
       resetZoom(); // Zoom out to full view
     }
   });
@@ -1298,7 +1337,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const newWidth = entry.contentRect.width;
         const newHeight = entry.contentRect.height;
         // Set new height relative to window height, capped by newWidth for square aspect
-        const maxWidth =  Math.min(newWidth, newHeight);
+        const maxWidth = Math.min(newWidth, newHeight);
 
         if (canvas.width !== maxWidth || canvas.height !== maxWidth) {
           canvas.width = maxWidth;
