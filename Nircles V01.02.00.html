@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nircles</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto" rel="stylesheet">
+    <style>
+        /* CSS Variables (from Tailwind config) */
+        #palette {
+            --Orange: #ED6631;
+            --charcoal: #555655;
+            --Silver: #A9ACA9;
+            --AshGrey: #bfc3ba;
+            --dark: #3a3835;
+            --fog: #F2EFEC;
+        }
+        
+        *{
+          margin: 2px;
+          padding: 0px;
+        }
+        
+        /* Base Styles */
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--Silver,#3a3835);
+            min-height: 100vh;
+            margin: 0;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center; 
+            box-sizing: border-box;
+        }
+        
+        .container-wrapper {
+            background-color: var(--charcoal, #555655);
+            margin-left: auto;
+            margin-right: auto; 
+            border-radius: 0.5rem; 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            padding: 0px; 
+            max-width: 100%; 
+            width: 100%; 
+            display: flex; 
+            flex-direction: column; 
+            flex-grow: 1;
+        }
+
+        /* Grid Layout */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr; 
+            gap: 8px; 
+            margin-bottom: 8px; 
+            flex-direction: column-reverse;
+        }
+        @media (min-width: 768px) { 
+            .main-grid {
+                grid-template-columns: repeat(6, 1fr); 
+                flex-direction: row-reverse; 
+            }
+        }
+
+        /* Column Styles */
+        .controls-column, .details-column {
+            grid-column: span 1 / span 1;
+            background-color: var(--fog, #F2EFEC);
+            padding: 4px; 
+            border-radius: 0.5rem; 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        @media (min-width: 768px) {
+            .visualization-column {
+                grid-column: span 4 / span 4;
+                display: flex;            
+                flex-direction: column;            
+                justify-content: space-between;
+                align-items: left;
+                border-radius: 5px; 
+                min-width: 100%;
+            }
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 2.25rem; /* text-4xl */
+            font-weight: 800; /* font-extrabold */
+            text-align: center; /* text-center */
+            color: #1f2937; /* text-gray-800 */
+            margin-bottom: 1.5rem; /* mb-6 */
+        }
+        h2 {
+            font-size: 1.5rem; /* text-2xl */
+            font-weight: 700; /* font-bold */
+            color: #374151; /* text-gray-700 */
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        h3 {
+             font-size: 1.25rem; /* text-xl */
+            font-weight: 600; /* font-semibold */
+            color: #1f2937; /* text-gray-800 */
+            margin-bottom: 0.5rem; /* mb-2 */
+        }
+        h4 {
+             font-size: 1rem; /* text-xl */
+            font-weight: 600; /* font-semibold */
+            color: #374151; /* text-gray-700 */
+            margin-bottom: 0.5rem; /* mb-2 */
+        }
+        p {
+            color: #4b5563; /* text-gray-600 */
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        .text-sm {
+            font-size: 0.875rem;
+        }
+        .text-xs {
+            font-size: 0.75rem;
+        }
+        .text-gray-700 {
+            color: #374151;
+        }
+
+        /* Controls Section */
+        .controls-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 1rem; 
+            gap: 8px;
+        }
+        
+        /* Buttons */
+        button {
+            background-color: var(--Orange, #ED6631);
+            color: white;
+            font-weight: 700;
+            padding: 8px 16px;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease-in-out;
+            border: none;
+        }
+        button:hover {
+            background-color: black;
+            transform: scale(1.05);
+        }
+        button:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Input/Select Styles */
+        input[type=file] {
+            display: none;
+        }
+        .input-group {
+            margin-bottom: 1rem;
+        }
+        .form-label {
+            display: block;
+            color: #374151;
+            font-size: 0.875rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        select, input[type=text] {
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            width: 100%;
+            padding: 8px 12px;
+            color: #374151;
+            line-height: 1.25;
+            box-sizing: border-box;
+        }
+        select:focus, input[type=text]:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(237, 102, 49, 0.5);
+            border-color: transparent;
+        }
+        input[type=checkbox] {
+            accent-color: black;
+        }
+        input[type=range] {
+            accent-color: var(--Orange, #ED6631);
+        }
+        #searchInput {
+            max-width: 100%; 
+            margin-bottom: 0.5rem;
+            flex-grow: 1;
+        }
+
+        /* Visualization Area */
+        #visualizationColumn {
+            grid-column: span 1 / span 1;
+        }
+        @media (min-width: 768px) {
+            #visualizationColumn {
+                grid-column: span 4 / span 4;
+            }
+        }
+        #folderViz {
+            background-color: var(--Silver, #A9ACA9);
+            border-radius: 2.5rem; 
+            box-shadow: 0 6px 6px 0 rgba(0, 0, 0, 0.1);
+            cursor: crosshair;
+            display: block;
+            width: 100%;
+        }
+        #folderViz.grabbing {
+            cursor: grab;
+        }
+
+        /* Details and Search Results */
+        .detail-item, .summary-item {
+            color: #374151;
+            margin-bottom: 4px;
+        }
+        #selectedItemDetails {
+            color: #4b5563;
+        }
+        #initialDetailsPrompt {
+            color: #4b5563;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        
+        /* Breadcrumbs */
+        .breadcrumb-item {
+            cursor: pointer;
+            color: #0078d7;
+            text-decoration: none;
+            align-items: left;
+            justify-content: left;
+            text-align: left;
+        }
+        .breadcrumb-item:hover {
+            text-decoration: underline;
+        }
+        .breadcrumb-item.current {
+            color: #585858;
+            cursor: default;
+            text-decoration: none;
+        }
+
+        /* Color Legend */
+        #typeLegendItems, #searchItems {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 4px;
+            font-size: 0.875rem;
+        }
+        #typeLegendItems > div, #searchItems > div {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #dateLegendItems, #depthLegendItems, #fileSizeLegendItems {
+            margin-top: 8px;
+        }
+        .legend-bar {
+            height: 1rem;
+            width: 100%;
+            border-radius: 9999px;
+        }
+        .legend-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            margin-top: 4px;
+        }
+        #dateLegendBar {
+            background: linear-gradient(to left, var(--fog, #F2EFEC), #2B2A28);
+        }
+        #depthLegendBar {
+            background: linear-gradient(to right, #98edfa, #94f787,#f4c576, #f26e6e, #6857eb);
+        }
+        #fileSizeLegendBar {
+            background: linear-gradient(to left, rgb(226, 221, 219), rgb(0, 0, 0));
+        }
+
+        /* Bottom Row */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        @media (min-width: 768px) {
+            .bottom-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        .search-results-box {
+            grid-column: 1;
+            background-color: var(--fog, #F2EFEC);
+            padding: 8px;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        @media (min-width: 768px) {
+            .search-results-box {
+                grid-column: span 2 / span 2;
+            }
+        }
+
+        .guide-box {
+            grid-column: span 1 / span 1;
+            background-color: var(--fog, #F2EFEC);
+            border-radius: 0.5rem;
+            padding: 0px; 
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* D3 Canvas Text Styles */
+        text { 
+            font-family: 'Roboto', sans-serif; 
+            fill: black;
+            stroke: white; 
+            stroke-width: 3; 
+            font-size: 16px; 
+            paint-order: stroke fill;
+            text-anchor: middle; 
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: absolute;
+            text-align: left;
+            padding: 8px;
+            background: var(--Silver, #A9ACA9);
+            color: black;
+            border: black;
+            border-style: solid;
+            border-width: 1px;
+            border-radius: 6px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            font-size: 15px;
+            box-shadow: 0 4px 6px #000000;
+            max-width: 250px;
+            word-wrap: break-word;
+        }
+
+        /* Message Box */
+        .message-box-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: #bfc3ba88; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+
+        .message-box-content {
+            background-color: #fff;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px var(--charcoal, #555655), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            max-width: 24rem;
+            width: 100%;
+            text-align: center;
+        }
+        .message-box-content button {
+            background-color: #2563eb;
+        }
+        .message-box-content button:hover {
+            background-color: #1d4ed8;
+        }
+
+        /* Utility classes replacement */
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .flex-wrap { flex-wrap: wrap; }
+        .justify-between { justify-content: space-between; }
+        .items-center { align-items: center; }
+        .space-x-2 > * + * { margin-left: 0.5rem; }
+        .list-disc { list-style-type: disc; }
+        .list-inside { list-style-position: inside; }
+        .hidden { display: none !important; }
+        .rounded-full { border-radius: 9999px; }
+        .w-4 { width: 1rem; }
+        .h-4 { height: 1rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mt-4 { margin-top: 1rem; }
+        .mt-2 { margin-top: 0.5rem; }
+        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+        .px-4 { padding-left: 1rem; padding-right: 1rem; }
+    </style>
+</head>
+
+<body class="min-w-screen">
+    <div class="container-wrapper">
+        <div class="main-grid">
+            <div class="controls-column">
+                <h1>
+                    Nircles
+                </h1>
+                <p>
+                    See all of your files and folders as nested circles, reveal the structure of your directories.
+                </p>
+                <h2>Controls</h2>
+                <div class="controls-buttons">
+                    <input type="file" id="jsonFileLoad" accept=".json">
+                    <button id="loadJsonFileButton">
+                        Load Summary
+                    </button>
+                    <button id="zoomOutButton">
+                        Reset Zoom
+                    </button>
+                    <button id="goUpButton">
+                        Go Up
+                    </button>
+                </div> 
+                
+                <div class="input-group">
+                    <label for="sortBy" class="form-label">
+                        Sort By:
+                    </label>
+                    <select id="sortBy">
+                    <option value="size">File size</option>
+                    <option value="reverseSize">File Size Reverse</option>
+                    <option value="name">File Name</option>
+                    </select>
+                </div> 
+                <div class="slidecontainer">
+                        <label for="paddingFactor" class="form-label">
+                            Padding:
+                            <input type="range" min="0" max="3600" value="1000" class="slider" id="paddingFactor">
+                        </label>
+                        <label for="ignoreSize" class="form-label">
+                            Use file size:
+                            <input type="range" min="1" max="100" value="100" class="slider" id="ignoreSize" value="Yes">
+                            <label for="ignore">100%</label><br>
+                        </label>
+                        <input type="checkbox" id="hideLabels" value="Yes">
+                        <label for="hideLabels">
+                            Hide labels
+                        </label>
+                        <br>
+                        <input type="checkbox" id="hexagonalFiles" value="Yes">
+                        <label for="hexagonalFiles">
+                            Hexagonal Files
+                        </label>
+                        <br>
+                    </div>
+
+                <div class="input-group">    
+                    <label class="form-label">
+                        Search:
+                    </label>
+                    <input type="text" id="searchInput" placeholder="Search...">
+                    <p class="detail-item text-sm">
+                        <strong>Results:</strong> <span id="searchCount"></span>
+                    </p>
+                    <p class="detail-item text-sm">
+                        <strong>Total:</strong> <span id="searchSummary"></span>
+                    </p>
+                    <div class="input-group">
+                         <button id="filterButton" class="hidden">
+                         Filter
+                        </button>
+                    </div>
+                    <div class="input-group">
+                         <button id="resetButton" class="hidden">
+                         Remove Filter
+                        </button>
+                    </div>
+                </div>
+                
+                </div>
+            
+            <div id="visualizationColumn" class="visualization-column">
+                <canvas id="folderViz"></canvas>
+            <div class="details-column">
+                <p class="detail-item">
+                <strong>Breadcrumbs:</strong> <span id="breadcrumbs"></span>
+            </p>  
+                    <p class="detail-item">
+                        <strong>Copyable Path:</strong> <span id="detailPath"></span>
+                    </p>
+                    </div> 
+            </div>
+            <div class="details-column">
+                <h2>Details</h2>
+                
+                <div class="input-group">
+                    <p class="text-xl font-semibold text-gray-800 mb-2">
+                        <strong>Main Summary:</strong> 
+                    </p>
+                    <span id="folderSummary"></span>
+                </div> 
+                
+                     <div class="input-group">
+                         <button id="exportPngButton" class="py-2 px-4">
+                         Export PNG
+                        </button>
+                    </div>
+                <div id="selectedItemDetails" class="hidden">
+                    <h3>
+                        Selected Item:
+                    </h3>
+                    <div >
+                        <button id="copyPathButton">    
+                        Copy Path
+                    </button>
+                    </div>
+                    <p class="detail-item">
+                        <strong>Name:</strong> <span id="detailName"></span>
+                    </p>
+                    <p class="detail-item">
+                        <strong>Type:</strong> <span id="detailType"></span>
+                    </p>
+                    <p class="detail-item">
+                        <strong>Sub-items:</strong> <span id="detailChildren"></span>
+                    </p>
+                    <p class="detail-item">
+                        <strong>Size:</strong> <span id="detailSize"></span>
+                    </p>
+                    <p class="detail-item">
+                        <strong>Last Modified:</strong>
+                        <span id="detailLastModified"></span>
+                    </p>
+                </div>
+                <div id="initialDetailsPrompt">
+                    <p>
+                        Click on any item to see its details here.
+                    </p>
+                </div>
+                
+            <h2 class="mt-4">Colour Legend</h2>
+                <div class="input-group">
+                    <label for="colorBy" class="form-label">
+                        Colour By:
+                    </label>
+                    <select id="colorBy">
+                        <option value="depth">Depth</option>
+                        <option value="type">File Type</option>
+                        <option value="fileSize">Size</option>
+                        <option value="date">Last Modified Date</option>
+                    </select>
+                </div>
+                <div id="typeLegendItems">
+                    </div>
+                <div id="dateLegendItems" class="hidden">
+                    <h4>Last Modified Date</h4>
+                    <div id="dateLegendBar" class="legend-bar">
+                    </div>
+                    
+                <div class="slidecontainer">
+                        <label for="dateCutoff" class="form-label">
+                            Date:
+                            <input type="range" min="0" max="100" class="slider" id="dateCutoff">
+                        </label>
+                        </div>
+                    <div class="legend-labels">
+                        <span id="minDateLabel"></span>
+                        <span id="maxDateLabel"></span>
+                    </div>
+                </div>
+                <div id="depthLegendItems" class="hidden">
+                    <h4>Depth</h4>
+                    <div id="depthLegendBar" class="legend-bar">
+                    </div>
+                    <div class="legend-labels">
+                        <span id=""></span>
+                        <span id="maxDepthLabel"></span>
+                    </div>
+                </div>
+                <div id="fileSizeLegendItems" class="hidden">
+                    <h4>Folder Size</h4>
+                    <div id="fileSizeLegendBar" class="legend-bar"></div>
+                    <div class="legend-labels">
+                        <span id="minFileSizeLabel">Smallest</span>
+                        <span id="maxFileSizeLabel">Largest</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom-grid">
+            <div class="search-results-box">
+                <h2>Search Results</h2>
+                <div id="searchItems" class="text-gray-600">
+                </div>
+                <div id="initialSearchPrompt">
+                <p>
+                        Enter a search term to see up to 20 of the results listed here.
+                    </p>
+                </div>
+            </div>
+            <div class="guide-box">
+                <h2>Guide</h2>
+                <p>
+                    This is a demonstration of alternative folder visualisation techniques. Other examples include branching trees, tree maps, and sunburst diagrams.
+                    These nested circles can be used to represent any arbitrarily complex hierarchy structure.
+                    
+                </p>
+                <ul class="list-disc list-inside">
+                    <li>Larger circles or nested circles represent folders or directories.</li>
+                    <li>Smaller, innermost circles represent individual files.</li>
+                </ul>
+                <p> 
+                    Created by Gwen Protheroe 2025. 
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <div id="tooltip" class="tooltip"></div>
+
+	<script src="NirclesScriptv01.02.00.js"></script>
+</body>
+
+</html>
