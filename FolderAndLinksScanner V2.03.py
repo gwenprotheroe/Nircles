@@ -9,6 +9,8 @@ from datetime import datetime
 
 # --- Configuration ---
 maxdepth = 18  # existing depth cap
+maxcount = 1000000
+maxsize = 1000000
 follow_symlinks = False
 follow_windows_shortcuts = True
 
