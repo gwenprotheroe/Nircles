@@ -644,18 +644,19 @@ searchInput.addEventListener('keydown', function (event) {
       const key = node.data.path + (node.data.name || "");
       oldNodeMap.set(key, { x: node.x, y: node.y, r: node.r });
     });
-
+    
     const root = d3
-      .hierarchy(data)
-      .sum((d) => Math.pow(d.value, ignoreSize.value / 100)) //ignoreSize.checked ?  (d.value / d.value) : +d.value)
-      .sort((a, b) => sortItOut(a, b));
-
+    .hierarchy(data)
+    .sum((d) => Math.pow(d.value, ignoreSize.value / 100)) //ignoreSize.checked ?  (d.value / d.value) : +d.value)
+    .sort((a, b) => sortItOut(a, b));
+    
+    let ratio = (d) => d.value / currentDataNodes[0].value;
     const pack = d3
-      .pack()
-          .size([containerWidth, containerHeight])
-        //   .padding((d) =>Math.log10(d.value));
-      .padding((d) =>Math.log10(d.value) * Math.pow(paddingFactorslider.value / 1200, 2)); //Original value 0.3
-
+    .pack()
+    .size([containerWidth, containerHeight])
+    //   .padding((d) =>Math.log10(d.value));
+    .padding(Math.pow(paddingFactorslider.value / 1200, 2)); //Original value 0.3
+    
     currentDataNodes = pack(root).descendants();
     const targetNodes = pack(root).descendants();
             setColorDomains(); 
