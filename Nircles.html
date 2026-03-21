@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nircles</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- <link rel="stylesheet" href="stylesheet.css"> -->
+    <link rel="stylesheet" href="topnav.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="folderTree.css">
+</head>
+
+<body>
+
+    <div class="navbar" id="navbar">
+        <div class="fileMenu">
+            <button class="dropbtn" onclick="dropdown('fileDropdown')">File</button>
+            <div id="fileDropdown" class="dropdown-content">
+                <a id="newScanLink">New Scan</a>
+                <a id="loadJsonFileButton" href="#">Load Scan</a>
+                <input type="file" id="jsonFileLoad" accept=".json">
+                <a id="saveJsonButton" href="#">Save Scan</a>
+                <a id="exportPngButton" href="#">Export Image</a>
+                <a id="exportSvgButton" href="#">Export SVG</a>
+                <a id="closeApp" href="#">Close</a>
+            </div>
+        </div>
+        <div class="editMenu">
+            <button class="dropbtn" onclick="dropdown('editDropdown')">Edit</button>
+            <div id="editDropdown" class="dropdown-content">
+                <a href="#">Undo</a>
+                <a href="#">Redo</a>
+                <a href="#">Move</a>
+                <a href="#">Copy</a>
+                <a href="#">Delete</a>
+                <a id="ScanSettings" href="#">Scan Settings</a>
+            </div>
+        </div>
+        <div class="viewMenu">
+            <button class="dropbtn" onclick="dropdown('viewDropdown')">View</button>
+            <div id="viewDropdown" class="dropdown-content">
+                <a id="viewSettings" href="#">View Settings</a>
+                <a id="NavMode" href="#">Navigation Mode</a>
+                <a id="AnalysisMode" href="#">Analysis Mode</a>
+                <a id="EditingMode" href="#">Editing Mode</a>
+                <a id="zoomOutButton" href="#">Reset Zoom</a>
+            </div>
+        </div>
+        <div class="helpMenu">
+            <button class="dropbtn" onclick="dropdown('helpDropdown')">Help</button>
+            <div id="helpDropdown" class="dropdown-content">
+                <a href="#">Documentation</a>
+                <a href="#">Feedback</a>
+                <a href="#">About</a>
+            </div>
+        </div>
+        <a href="javascript:void(0);" class="icon" onclick="navbarResponse()">
+            <i class="fa fa-bars"></i>
+        </a>
+    </div>
+    <div class="addressbar">
+        <div class="detail-item">
+            <strong>Breadcrumbs:</strong> <span id="breadcrumbs"></span>
+            <p class="detail-item">
+                <strong>Full Path:</strong> <span id="detailPath"></span>
+            </p>
+        </div>
+        <div class="output-group">
+            <button id="copyPathButton">
+                Copy Path
+            </button>
+        </div>
+        <h2> Search: </h2>
+        <!-- </label> -->
+        <input type="text" id="searchInput" placeholder="Search...">
+    </div>
+    <div class="container-wrapper">
+        <div class="main-grid">
+            <div id="folder-tree-column" class="details-column">
+                <h2>Folder Tree</h2>
+                <div id="folder-tree-container"></div>
+            </div>
+            <div id="visualizationColumn" class="visualization-column">
+                <canvas id="folderViz"></canvas>
+            </div>
+            <div id="interaction-graph-container" class="interaction-graph-column">
+                <div class="input-group">
+                    <label for="colorBy" class="form-label">
+                        Colour By:
+                    </label>
+                    <select id="colorBy">
+                        <option value="depth">Depth</option>
+                        <option value="type">File Type</option>
+                        <option value="fileSize">Size</option>
+                        <option value="date">Last Modified Date</option>
+                    </select>
+                </div>
+                <div id="typeLegendItems" class="hidden">
+                    <h4>File Type</h4>
+                    <!-- <svg id="pie"></svg> -->
+                    <div id="file-type-pie"></div>
+                </div>
+            <div id="dateLegendItems" class="hidden">
+                <h4>Last Modified Date</h4>
+                <svg id="date-graph"></svg>
+                <div id="dateLegendBar" class="legend-bar">
+                </div>
+                <div class="slidecontainer">
+                    <label for="dateCutoff" class="form-label">
+                        Date:
+                        <input type="range" min="0" max="100" class="slider" id="dateCutoff">
+                    </label>
+                    </div>
+                    <div class="legend-labels">
+                        <span id="minDateLabel"></span>
+                        <span id="maxDateLabel"></span>
+                    </div>
+                </div>
+                <div id="depthLegendItems" class="hidden">
+                    <h4>Depth</h4>
+                    <svg id="depth-histogram"></svg>
+                    <div id="depthLegendBar" class="legend-bar">
+                    </div>
+                    <div class="legend-labels">
+                        <span id="minDepthLabel"></span>
+                        <span id="maxDepthLabel"></span>
+                    </div>
+                </div>
+                <div id="fileSizeLegendItems" class="hidden">
+                    <h4>Folder Size</h4>
+                    <svg id="size-graph"></svg>
+                    <div id="fileSizeLegendBar" class="legend-bar"></div>
+                    <div class="legend-labels">                    
+                        
+                        <span id="minFileSizeLabel">Smallest</span>
+                        <span id="maxFileSizeLabel">Largest</span>
+                    </div>
+                </div>
+            </div>
+                <p class="detail-item small-text">
+                    <strong>Results:</strong> <span id="searchCount"></span>
+                </p>
+                <p class="detail-item small-text">
+                    <strong>Total:</strong> <span id="searchSummary"></span>
+                </p>
+                <div>
+                </div>
+                <div>
+                    
+                </div>
+            </div>
+        </div>
+        <div class="details-column">
+            <div class="input-group">
+                <div class="input-group">
+                    <button id="filterButton" class="hidden">
+                        Filter
+                    </button>
+                </div>
+                <div class="input-group">
+                    <button id="filterOutButton" class="hidden">
+                        Filter Out
+                    </button>
+                </div>
+                <div class="input-group">
+                    <button id="resetButton" class="hidden">
+                        Remove Filter
+                    </button>
+                </div>
+            </div>
+
+            <div class="input-group">
+            <h2>Details</h2>
+                <h3>
+                    Main Summary:
+                </h3>
+                <span id="folderSummary"></span>
+            <div id="selectedItemDetails" class="hidden">
+                <h3>
+                    Selected Item:
+                </h3>
+                <p class="detail-item">
+                    <strong>Name:</strong> <span id="detailName"></span>
+                </p>
+                <p class="detail-item">
+                    <strong>Type:</strong> <span id="detailType"></span>
+                </p>
+                <p class="detail-item">
+                    <strong>Sub-items:</strong> <span id="detailChildren"></span>
+                </p>
+                <p class="detail-item">
+                    <strong>Size:</strong> <span id="detailSize"></span>
+                </p>
+                <p class="detail-item">
+                    <strong>Last Modified:</strong>
+                    <span id="detailLastModified"></span>
+                </p>
+            </div>
+        </div>
+
+            <div id="initialDetailsPrompt">
+                <p>
+                    Click on any item to see its details here.
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="settings-box-overlay hidden" id="viewSettingsMenu">
+        <div class="settings-box-content">
+            <h3>Settings</h3>
+            <div class="controls-buttons">
+                <h2>Colour Legend</h2>
+                <label for="visStyle" class="form-label">
+                    Style:
+                </label>
+                <a> <select id="visStyle">
+                        <option value="nircle">Nircles</option>
+                        <option value="treeMap">Tree Map</option>
+                        <option value="sunBurst">Sunburst</option>
+                    </select> </a>
+
+                
+                <label for="sortBy" class="form-label">
+                    Sort By:
+                </label>
+                <a> <select id="sortBy">
+                        <option value="size">File size</option>
+                        <option value="reverseSize">File Size Reverse</option>
+                        <option value="name">File Name</option>
+                    </select> </a>
+            </div>
+            <div class="slidecontainer">
+                <label for="paddingFactor" class="form-label">
+                    Padding:
+                    <input type="range" min="1" max="5000" value="1000" class="slider" id="paddingFactor">
+                </label>
+                <label for="ignoreSize" class="form-label">
+                    Use file size:
+                    <input type="range" min="1" max="100" value="100" class="slider" id="ignoreSize" value="Yes">
+                    <label for="ignore">100%</label><br>
+                </label>
+                <input type="checkbox" id="hideLabels" value="Yes">
+                <label for="hideLabels">
+                    Hide labels
+                </label>
+                <br>
+                <input type="checkbox" id="hexagonalFiles" value="Yes">
+                <label for="hexagonalFiles">
+                    Hexagonal Files
+                </label>
+                <br>
+            </div>
+            <button id="closeSettingsBox">OK</button>
+        </div>
+    </div>
+    </div>
+    <div class="bottom-grid">
+        <div class="search-results-box">
+            <h2>Search Results</h2>
+            <div id="searchItems">
+            </div>
+            <div id="initialSearchPrompt">
+                <p>
+                    Enter a search term to see results.
+                </p>
+            </div>
+        </div>
+        <div class="guide-box">
+            <h2>Guide</h2>
+            <p>
+                This is a demonstration of alternative folder visualisation techniques. Other examples include branching
+                trees, tree maps, and sunburst diagrams.
+                These nested circles can be used to represent any arbitrarily complex hierarchy structure.
+            </p>
+            <ul class="list-disc list-inside">
+                <li>Larger circles or nested circles represent folders or directories.</li>
+                <li>Smaller, innermost circles represent individual files.</li>
+            </ul>
+            <p>
+                Created by Gwen Protheroe 2025.
+            </p>
+        </div>
+    </div>
+    </div>
+    </div>
+
+    <div id="tooltip" class="tooltip"></div>
+    <script>
+
+        function navbarResponse() {
+            var x = document.getElementById("navbar");
+            if (x.className === "navbar") {
+                x.className += " responsive";
+            } else {
+                x.className = "navbar";
+            }
+        }
+
+        function dropdown(itemName) {
+            var x = document.getElementById(itemName);
+            // Get all dropdown content elements
+            var dropdowns = document.getElementsByClassName("dropdown-content");
+            // Loop through the dropdowns and remove the "show" class
+            for (var i = 0; i < dropdowns.length; i++) {
+                dropdowns[i].className = "dropdown-content";
+            }
+            x.className += " show";
+        }
+
+        // Close the dropdown if the user clicks outside of it
+        window.onclick = function (e) {
+            // Check if the clicked element is not a dropdown button
+            if (!e.target.matches('.dropbtn')) {
+                // Get all dropdown content elements
+                var dropdowns = document.getElementsByClassName("dropdown-content");
+                // Loop through the dropdowns and remove the "show" class
+                for (var i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
+            if (e.target.matches('viewSettings')) {
+                var viewSettingsMenu = document.getElementById('viewSettingsMenu');
+                if (viewSettingsMenu.classList.contains('show')) {
+                    viewSettingsMenu.classList.remove('show');
+                }
+            }
+            if (e.target.matches('scanSettings')) {
+                var scanSettingsMenu = document.getElementById('scanSettingsMenu');
+                if (scanSettingsMenu.classList.contains('show')) {
+                    scanSettingsMenu.classList.remove('show');
+                }
+            }
+
+        }
+
+
+    </script>
+
+    <script src="NirclesScript.js"></script>
+    <script src="Interaction Graphs.js"></script>
+    <script src="folderTree.js"></script>
+</body>
+
+</html>

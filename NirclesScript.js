@@ -20,13 +20,15 @@ document.addEventListener("DOMContentLoaded", function () {
   const jsonFileLoad = document.getElementById("jsonFileLoad");
   const loadJsonFileButton = document.getElementById("loadJsonFileButton");
   const zoomOutButton = document.getElementById("zoomOutButton");
-  const goUpButton = document.getElementById("goUpButton"); // New Go Up button
-  const exportPngButton = document.getElementById("exportPngButton"); // New Export PNG button
+  const exportPngButton = document.getElementById("exportPngButton");
   const copyPathButton = document.getElementById('copyPathButton');
   const filterButton = document.getElementById("filterButton");
+  const filterOutButton = document.getElementById("filterOutButton");
   const treeMapButton = document.getElementById("treeMapButton");
   const NircleButton = document.getElementById("NircleButton");
   const sunBurstButton = document.getElementById("sunBurstButton");
+  const viewSettings = document.getElementById("viewSettings");
+  const scanSettingsButton = document.getElementById("scanSettingsButton");
   const resetButton = document.getElementById("resetButton");
   let originalFullData = null; // To store the state for Reset
 
@@ -440,6 +442,34 @@ document.addEventListener("DOMContentLoaded", function () {
     // 4. No match here and no matching descendants
     return null;
   }
+  function filteroutHierarchy(node, mismatchesSearch) {
+            filtered = true;
+// 1. If the current node matches, we remove it and EVERYTHING inside it
+    if (!mismatchesSearch(node)) {
+      return null;
+    }
+    // 2. If the node doesn't match, check if it has children to explore
+    if (node.children && node.children.length >= 0) {
+      // Recursively filter the children
+      const filteredChildren = node.children
+        .map((child) => filteroutHierarchy(child, mismatchesSearch))
+        .filter((child) => child !== null);
+
+      // 3. If any children were kept, keep this parent node too
+      if (filteredChildren.length >= 0) {
+        const newNode = { ...node };
+        newNode.children = filteredChildren;
+        return newNode;
+      } else {
+        // If no children are kept, we still want to keep this node (as an empty folder)
+        return node;
+      }
+    }
+
+    // 4. No match here and no matching descendants
+    return node;
+  }
+    initiateVisuals(rootNodeData);
 
   //////////////////////////////////////////////////////////////////////////////
   ///////////////////    Event listeners for everything ////////////////////////
@@ -447,7 +477,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Event listener for the "Load JSON File" button
   loadJsonFileButton.addEventListener("click", function () {
     jsonFileLoad.click(); // Trigger the hidden file input click
-  });
+      });
 
   // Event listener for when a file is selected via the input
   jsonFileLoad.addEventListener("change", function (event) {
@@ -460,13 +490,19 @@ document.addEventListener("DOMContentLoaded", function () {
     const reader = new FileReader();
     reader.onload = function (e) {
       try {
-        rootNodeData = JSON.parse(e.target.result); // Store original root data
+        window.rootNodeData = JSON.parse(e.target.result); // Store original root data
         processAndRenderVisualization(rootNodeData);
-        originalFullData = JSON.parse(JSON.stringify(rootNodeData)); // Update the reset function
+        window.originalFullData = JSON.parse(JSON.stringify(rootNodeData)); // Update the reset function
         searchInput.value = ""; // Clear search on new load
         searchTerm = "";
         folderSummary.value = ""; //Clear summary
+        searchInput.value = "";
+        resetButton.classList.add("hidden");
+        filtered = false;
+        filterString = "";
         updateBreadcrumbs();
+        initiateVisuals(rootNodeData);
+
       } catch (error) {
         displayMessageBox(
           "Error reading or parsing the JSON file.\nError: " + error.message,
@@ -478,38 +514,49 @@ document.addEventListener("DOMContentLoaded", function () {
         displayMessageBox("Failed to read the file.", "Error");
     };
     reader.readAsText(file); // Read the file content as text
-  });
+});
 
   // Event listener for color selection change
-  colorBySelect.addEventListener("change", function () {
-    if (currentDataNodes.length > 0) {
-      processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-      drawVisualization(); // Re-draw with new color scheme
-    }
-  });
+  if (colorBySelect) {
+    colorBySelect.addEventListener("change", function () {
+      if (currentDataNodes.length > 0) {
+        processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
+        drawVisualization(); // Re-draw with new color scheme
+      }
+    });
+  }
 
   // Event listener for sorting criteria change
-  sortBySelect.addEventListener("change", function () {
-    processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-    zoomToNode(currentZoomNode); // Reset zoom to fit the new data
-  });
+  if (sortBySelect) {
+    sortBySelect.addEventListener("change", function () {
+      processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
+          initiateVisuals(rootNodeData);
+zoomToNode(currentZoomNode); // Reset zoom to fit the new data
+    });
+  }
   // Event listener for sorting criteria change
-  hideLabels.addEventListener("change", function () {
-    processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-    zoomToNode(currentZoomNode); // Reset zoom to fit the new data
-  });
+  if (hideLabels) {
+    hideLabels.addEventListener("change", function () {
+      processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
+      zoomToNode(currentZoomNode); // Reset zoom to fit the new data
+    });
+  }
 
   // Event listener for hexagonal files  change
+  if (hexagonalFiles) {
   hexagonalFiles.addEventListener("change", function () {
     processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
     zoomToNode(currentZoomNode); // Reset zoom to fit the new data
   });
+  }
 
   // Event listener for padding criteria input
+  if (paddingFactorslider) {
   paddingFactorslider.addEventListener("input", function () {
     processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
     zoomToNode(currentZoomNode); // Reset zoom to fit the new data
   });
+  }
 
   // Event listener for date colour criteria input
   dateCutoff.addEventListener("input", function () {
@@ -518,25 +565,21 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // Event listener for file size criteria change
-  ignoreSize.addEventListener("input", function () {
-    processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-    zoomToNode(currentZoomNode); // Reset zoom to fit the new data
-  });
+  if (ignoreSize) {
+    ignoreSize.addEventListener("input", function () {
+      processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
+      zoomToNode(currentZoomNode); // Reset zoom to fit the new data
+    });
+  } else {
+    ignoreSize.value = 100;
+  } 
 
   // Event listener for Zoom Out button
-  zoomOutButton.addEventListener("click", function () {
-    zoomToNode(currentDataNodes[0]);
-  });
-
-  // Event listener for Go Up button
-  goUpButton.addEventListener("click", function () {
-    if (currentZoomNode && currentZoomNode.parent) {
-        zoomToNode(currentZoomNode.parent);
-        currentZoomNode = currentZoomNode.parent;
-    } else {
-      resetZoom(); // If no parent, go to root
-    }
-  });
+  if (zoomOutButton) {
+    zoomOutButton.addEventListener("click", function () {
+      zoomToNode(currentDataNodes[0]);
+    });
+  }
 
    copyPathButton.addEventListener("click", function() {
     // Determine which path to copy: the selected node or the current zoomed node
@@ -564,7 +607,8 @@ document.addEventListener("DOMContentLoaded", function () {
   // Event listener for Search input
   searchInput.addEventListener("input", function () {
     searchTerm = this.value.toLowerCase();
-    drawVisualization(); // Redraw to apply search highlighting
+        initiateVisuals(rootNodeData);
+drawVisualization(); // Redraw to apply search highlighting
   });
 
    filterButton.addEventListener("click", function () {
@@ -585,13 +629,40 @@ document.addEventListener("DOMContentLoaded", function () {
       processAndRenderVisualization(rootNodeData);
       resetZoom();
     } else {
-      displayMessageBox("No results found to filter.", "Filter would remove everything");
+      displayMessageBox("Filter would remove everything", "Filter removed");
+    }
+
+    resetButton.classList.remove("hidden");
+    searchTerm = "";  
+    searchInput.value = "";
+   });
+  
+  filterOutButton.addEventListener("click", function () {
+    if (searchTerm.length < 2) {
+      displayMessageBox( "Filter would remove everything", "Filter removed");
+      return;
+    }
+    filterString = filterString + "Not " + searchTerm + ", ";
+    const mismatchesSearch = (d) => !d.name.toLowerCase().includes(searchTerm);
+    // Apply the recursive filter to the current rootNodeData but invert the match to filter out
+    const filteredData = filteroutHierarchy(rootNodeData, mismatchesSearch);
+
+    if (filteredData) {
+      rootNodeData = filteredData;
+      processAndRenderVisualization(rootNodeData);
+      resetZoom();
+    } else {
+      displayMessageBox("No results found to filter out.", "Filter would remove everything");
     }
 
     resetButton.classList.remove("hidden");
     searchTerm = "";
     searchInput.value = "";
   });
+
+viewSettings.addEventListener("click", function () {
+  displaySettingsBox();
+});
 
 
   resetButton.addEventListener("click", function () {
@@ -605,33 +676,50 @@ document.addEventListener("DOMContentLoaded", function () {
     processAndRenderVisualization(rootNodeData);
     resetZoom();
   });
-
   
     // Trigger filter when "Enter" is pressed in the search box
-searchInput.addEventListener('keydown', function (event) {
+searchInput.addEventListener('keyup', function (event) {
     if (event.key === 'Enter') {
         event.preventDefault();
         
         const currentSearch = searchInput.value.trim();
         
-        if (currentSearch.length >= 2) {
-            filterButton.click();
-        } else if (currentSearch.length === 0) {
+      if (currentSearch.length >= 2) {
+        if (event.shiftKey && event.key === 'Enter') {
+          filterOutButton.click();
+        } else {
+          filterButton.click();
+        }
+      } else if (currentSearch.length === 0) {
             // If they hit enter on an empty box, reset the view
             resetButton.click();
         } else {
             displayMessageBox("Please enter at least 2 characters to filter.", "Info");
         }
-    }
+  }
 });
 
+  function initiateVisuals(data) {
+    if (typeof InteractionGraphs === 'function') {
+      new InteractionGraphs(data, '#interaction-graph-container');
+    }
+    if (typeof createFolderTree === 'function') {
+      createFolderTree(data, '#folder-tree-container');
+    }
+    if (typeof createSunburst === 'function') {
+      createSunburst(data, '#sunburst-container');
+    }
+    if (typeof createTreemap === 'function') {
+      createTreemap(data, '#treemap-container');
+    }
+  }
 
   //////////////////////////////////////////////////////////////////
   /////////////        Draw                       //////////////////
   //////////////////////////////////////////////////////////////////
   // Function to process data and then draw
   function processAndRenderVisualization(data) {
-    const containerWidth = visualizationColumn.offsetWidth;
+        const containerWidth = visualizationColumn.offsetWidth;
     // Set canvas height relative to window height, capped by container width for square aspect
     const containerHeight = Math.min(containerWidth, window.innerHeight * 0.9);
 
@@ -754,9 +842,13 @@ searchInput.addEventListener('keydown', function (event) {
     if (searchTerm.length > 1) {
       searchLogic(matchesSearch);
       filterButton.classList.remove("hidden");
+      filterOutButton.classList.remove("hidden");
     } else {
       searchResults = "";
       filterButton.classList.add("hidden");
+      filterOutButton.classList.add("hidden");
+      searchCount.textContent = "";
+      searchSum.textContent = "";
       updateSearchResults(searchResults);
     }
 
@@ -1043,6 +1135,9 @@ searchInput.addEventListener('keydown', function (event) {
   //////////////////////////////////////////////////////////////
   // Function to sort based on selected option
   function sortItOut(a, b) {
+    if (!sortBySelect) {
+    return b.value - a.value;
+  } else {
     const sortMode = sortBySelect.value;
     if (sortMode === "size") {
       // This is correct as .value is set by D3's .sum()
@@ -1055,6 +1150,7 @@ searchInput.addEventListener('keydown', function (event) {
       return b.data.last_modified_unix - a.data.last_modified_unix;
     } else if (sortMode === "name") {
       return d3.descending(a.data.name, b.data.name);
+    }
     }
   }
   // Function to sort based on selected option
@@ -1414,6 +1510,7 @@ function exportCanvasAsPNG() {
       const distance = Math.sqrt(dx * dx + dy * dy);
 
       if (distance < d.r) {
+        window.selectedNode = d; // Store clicked node in global variable for access in other functions
         clickedNode = d;
         break;
       }
@@ -1423,36 +1520,18 @@ function exportCanvasAsPNG() {
       selectedNode = clickedNode; // Update selected node for details panel
       zoomToNode(clickedNode); // Zoom to the clicked node
 
-      // Display details in the third column
-      selectedItemDetails.classList.remove("hidden");
-      copyPathButton.classList.remove("hidden");
-      initialDetailsPrompt.classList.add("hidden");
-
-      detailName.textContent = selectedNode.data.name;
-      detailType.textContent = selectedNode.data.type || "Folder";
-      if (selectedNode.data.children) {
-        detailChildren.textContent =
-          selectedNode.data.children.length + " Children";
-      } else {
-        detailChildren.textContent = "";
-      }
-      detailSize.textContent = formatBytes(selectedNode.value);
-      detailLastModified.textContent = selectedNode.data.last_modified_iso
-        ? new Date(selectedNode.data.last_modified_unix * 1000).toLocaleString()
-        : "N/A";
-      if (selectedNode.data.children) {
-        detailPath.textContent = selectedNode.data.path;
-      } else {
-        detailPath.textContent =
-          selectedNode.data.path + "\\" + selectedNode.data.name;
-      }
+      selectedNodeDetails(clickedNode); // Update details panel with selected node info
 
       //Breadcrumbs or full path needs updating
       drawVisualization(); // Redraw to remove selection highlight
+
+      if (typeof window.highlightNodeInTree === 'function') {
+        window.highlightNodeInTree(selectedNode);
+      }
     } else {
       // If click occurred outside any node, clear selection and zoom out
       //if (selectedNode) {
-        selectedNode = null;
+        selectedNode = currentDataNodes[0]; // Reset to root node
         drawVisualization(); // Redraw to remove selection highlight
       //}
         selectedItemDetails.classList.add("hidden");
@@ -1462,6 +1541,32 @@ function exportCanvasAsPNG() {
       resetZoom(); // Zoom out to full view
     }
   });
+
+  function selectedNodeDetails(node) {
+    detailName.textContent = node.data.name;
+    detailType.textContent = node.data.type || "Folder";
+    // Display details in the third column
+      selectedItemDetails.classList.remove("hidden");
+      copyPathButton.classList.remove("hidden");
+      initialDetailsPrompt.classList.add("hidden");
+
+      if (node.data.type === "Folder") {
+        detailChildren.textContent =
+          selectedNode.data.children.length + " Children";
+      } else {
+        detailChildren.textContent = "";
+      }
+      detailSize.textContent = formatBytes(node.value);
+      detailLastModified.textContent = node.data.last_modified_iso
+        ? new Date(node.data.last_modified_unix * 1000).toLocaleString()
+        : "N/A";
+      if (node.data.children) {
+        detailPath.textContent = node.data.path;
+      } else {
+        detailPath.textContent =
+          node.data.path + "\\" + node.data.name;
+      }
+  }
 
   // Function to format bytes into human-readable format
   function formatBytes(bytes, decimals = 2) {
@@ -1486,9 +1591,7 @@ function exportCanvasAsPNG() {
       // Add items for search results
       searchResults.forEach((path) => {
         const resultItem = document.createElement("div");
-        // FIX: Removed 'flex items-center space-x-2' and added 'mb-1' for vertical spacing
-        resultItem.className =
-          "breadcrumb-item cursor-pointer hover:bg-gray-200 p-1 rounded mb-1";
+        resultItem.className = "search-result-item";
         resultItem.innerHTML = `<div> ${path.data.name} </div>`;
         resultItem.addEventListener("click", () => zoomToNode(path));
 
@@ -1512,27 +1615,27 @@ function exportCanvasAsPNG() {
 
     if (colorMode === "type") {
       typeLegendItems.classList.remove("hidden");
-      typeLegendItems.innerHTML = ""; // Clear previous legend items
+      //typeLegendItems.innerHTML = ""; // Clear previous legend items
 
       // Add legend item for folders (default gray)
-      const folderLegendItem = document.createElement("div");
-      folderLegendItem.className = "flex items-center space-x-2";
-      folderLegendItem.innerHTML = `
-                        <span class="w-4 h-4 rounded-full" style="background-color: #cbd5e1;"></span>
-                        <span>Folder</span>
-                    `;
-      typeLegendItems.appendChild(folderLegendItem);
+      // const folderLegendItem = document.createElement("div");
+      // folderLegendItem.className = "legend-item";
+      // folderLegendItem.innerHTML = `
+      //                   <span class="w-4 h-4 rounded-full" style="background-color: var(--AshGrey);"></span>
+      //                   <span>Folder</span>
+      //               `;
+      //typeLegendItems.appendChild(folderLegendItem);
 
       // Add legend items for file types
-      fileTypes.forEach((type) => {
-        const legendItem = document.createElement("div");
-        legendItem.className = "flex items-center space-x-2";
-        legendItem.innerHTML = `
-                        <span class="w-4 h-4 rounded-full" style="background-color: ${fileTypeColorScale(type)};"></span>
-                            <span>.${type}</span>
-                        `;
-        typeLegendItems.appendChild(legendItem);
-      });
+      // fileTypes.forEach((type) => {
+      //   const legendItem = document.createElement("div");
+      //   legendItem.className = "legend-item";
+      //   legendItem.innerHTML = `
+      //                   <span class="w-4 h-4 rounded-full" style="background-color: ${fileTypeColorScale(type)};"></span>
+      //                       <span>.${type}</span>
+      //                   `;
+      //   typeLegendItems.appendChild(legendItem);
+      // });
     } else if (colorMode === "date") {
       dateLegendItems.classList.remove("hidden");
     } else if (colorMode === "depth") {
@@ -1548,9 +1651,9 @@ function exportCanvasAsPNG() {
     messageBox.className = `message-box-overlay`;
     messageBox.innerHTML = `
                     <div class="message-box-content">
-                        <h3 class="text-xl font-bold mb-4 ${type === "Error" ? "text-red-600" : "text-blue-600"}">${type}</h3>
-                        <p class="text-gray-700 mb-6">${message}</p>
-                        <button id="closeMessageBox" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">OK</button>
+                        <h3 class="${type === "Error" ? "text-error" : "text-info"}">${type}</h3>
+                        <p>${message}</p>
+                        <button id="closeMessageBox">OK</button>
                     </div>
                 `;
     document.body.appendChild(messageBox);
@@ -1561,6 +1664,17 @@ function exportCanvasAsPNG() {
         document.body.removeChild(messageBox);
       });
   }
+
+  function displaySettingsBox() {
+    document.getElementById("viewSettingsMenu").classList.remove("hidden");
+    
+    document
+      .getElementById("closeSettingsBox")
+      .addEventListener("click", function () {
+    document.getElementById("viewSettingsMenu").classList.add("hidden");
+      });
+  }
+
 
   // Add a resize observer to redraw the canvas when its container changes size
   const resizeObserver = new ResizeObserver((entries) => {

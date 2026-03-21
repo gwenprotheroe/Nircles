@@ -1,0 +1,23 @@
+/* Styles for the folder tree container */
+#folder-tree-container {
+    overflow: auto;
+    height: 95vh; /* Or adjust as needed */
+    border-left: 1px solid #ccc;
+    padding-left: 10px;
+    text-align: left;
+}
+
+/* Style for the tree text */
+.node text {
+    font: 12px sans-serif;
+    align-items:normal;
+    text-align: right;
+}
+
+/* Style for the links between nodes */
+.link {
+    fill: none;
+    stroke: #555;
+    stroke-opacity: 0.4;
+    stroke-width: 5px;
+}
