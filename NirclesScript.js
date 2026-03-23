@@ -16,14 +16,18 @@ document.addEventListener("DOMContentLoaded", function () {
   const searchItems = document.getElementById("searchItems");
   const initialSearchPrompt = document.getElementById("initialSearchPrompt");
   
-    // Buttons!! Button for everything!
+  // Buttons!! Button for everything!
+  const newScanButton = document.getElementById("newScanButton");
   const jsonFileLoad = document.getElementById("jsonFileLoad");
   const loadJsonFileButton = document.getElementById("loadJsonFileButton");
+  const saveScanButton = document.getElementById("saveScanButton");
   const zoomOutButton = document.getElementById("zoomOutButton");
   const exportPngButton = document.getElementById("exportPngButton");
-  const copyPathButton = document.getElementById('copyPathButton');
+  const exportSvgButton = document.getElementById("exportSvgButton");
   const filterButton = document.getElementById("filterButton");
   const filterOutButton = document.getElementById("filterOutButton");
+  const copyPathButton = document.getElementById('copyPathButton');
+  const showAboutPageButton = document.getElementById("showAboutPageButton");
   const treeMapButton = document.getElementById("treeMapButton");
   const NircleButton = document.getElementById("NircleButton");
   const sunBurstButton = document.getElementById("sunBurstButton");
@@ -48,20 +52,24 @@ document.addEventListener("DOMContentLoaded", function () {
   const maxDateLabel = document.getElementById("maxDateLabel");
   const minFileSizeLabel = document.getElementById("minFileSizeLabel");
   const maxFileSizeLabel = document.getElementById("maxFileSizeLabel");
-  const searchInput = document.getElementById("searchInput"); // New Search input
+ 
   const folderSummary = document.getElementById("folderSummary"); //Global Folder Summary
+  const breadcrumbsDiv = document.getElementById("breadcrumbs"); // New Breadcrumbs div
+ 
+  let searchTerm = ""; // Current search term
+  const searchSummary = document.getElementById("searchSummarycontainer"); // Search summary container
+  const searchInput = document.getElementById("searchInput"); // New Search input
+  const seeResultsButton = document.getElementById("seeResultsButton"); // Button to view search results
   const searchCount = document.getElementById("searchCount"); // Search result count
   const searchSum = document.getElementById("searchSummary"); // Search result size
-  const breadcrumbsDiv = document.getElementById("breadcrumbs"); // New Breadcrumbs div
 
   const visualizationColumn = document.getElementById("visualizationColumn");
 
   let currentDataNodes = []; // Store the flattened nodes for event handling
   let rootNodeData = null; // Store the original root data for full zoom out
-  let hoveredNode = null; // Track the node currently under the mouse
-  let selectedNode = null; // Track the node currently selected by click for details panel
-  let currentZoomNode = null; // Track the node currently zoomed into
-  let searchTerm = ""; // Current search term
+  let hoveredNode = window.hoveredNode || null; // Track the node currently under the mouse
+  let selectedNode = window.selectedNode ||null; // Track the node currently selected by click for details panel
+  let currentZoomNode = window.currentZoomNode ||null; // Track the node currently zoomed into
     let filtered = false;   
     let filterString = "";
   let isAnimating = false;
@@ -73,7 +81,7 @@ document.addEventListener("DOMContentLoaded", function () {
   let transform = d3.zoomIdentity;
 
   // Define color scales
-  const fileTypeColorScale = d3.scaleOrdinal([
+  const categoricalColorScale = d3.scaleOrdinal([
     "#ED6631",
     "#1A845C",
     "#2A73D9",
@@ -105,21 +113,21 @@ document.addEventListener("DOMContentLoaded", function () {
     "#F8D5D5",
     "#F4B5B5", //shades of himalayan salt pink - oh get lost branding people.
   ]);
-  const fileSizeColorScale = d3
+  const exponentialColorScale = d3
     .scalePow()
-    .exponent(0.1)
+    .exponent(1)
     .range(["#030302", "#F2EFEC"]); //d3.scaleSequential(d3.interpolateBlues); // Using interpolateRainbow for all hues
-  // const fileDepthColorScale = d3.scaleLinear().range(['#FBE0D6','#B24D25']); //Shades of orange
-  const fileDepthColorScale = d3
+  // const linearRainbowColorScale = d3.scaleLinear().range(['#FBE0D6','#B24D25']); //Shades of orange
+  const linearRainbowColorScale = d3
     .scaleLinear()
     .range(["#98edfa", "#f26e6e"])
     .interpolate(d3.interpolateHslLong); // Rainbow for folder depth
-  const dateColorScale1 = d3
+  const linearBWColorScale1 = d3
     .scaleLinear()
-    .range(["#000000", "#ebebeb", "#ee7a06"]); // Shades of black white and orange for file and folder date
-  const dateColorScale2 = d3.scaleLinear().range(["#009900", "#F2EFEC"]); // Shades of green and white for folder depth
+    .range(["#000000", "#ebebeb"]); // Shades of black white and orange for file and folder date
+  const linearBWColorScale2 = d3.scaleLinear().range(["#009900", "#F2EFEC"]); // Shades of green and white for folder depth
 
-  // Dummy Data
+ // Dummy Data
   const defaultData = {
     path: "C:\\Demo",
     name: "Demo",
@@ -150,11 +158,21 @@ document.addEventListener("DOMContentLoaded", function () {
             children: [
               {
                 path: "C:\\Demo\\Files and Folders\\Very simply",
-                name: "Rick Deckards Blade Runner Blaster.mp4",
-                type: "mp4",
-                value: 290968,
+                name: "_",
+                type: "folder",
+                value: 0,
                 last_modified_unix: 1753489154.0142784,
                 last_modified_iso: "2025-07-26T01:19:14.014278",
+                children: [
+                  {
+                    path: "C:\\Demo\\Files and Folders\\Very simply",
+                    name: "Plans for World Domination.ppt",
+                    type: "ppt",
+                    value: 290968,
+                    last_modified_unix: 1753489154.0142784,
+                    last_modified_iso: "2025-07-26T01:19:14.014278",
+                  },
+                ],
               },
             ],
           },
@@ -178,7 +196,7 @@ document.addEventListener("DOMContentLoaded", function () {
             children: [
               {
                 path: "C:\\Demo\\See All\\Project 1",
-                name: "Really long name to test if the length of a text string is recognised",
+                name: "Data - Copy.json",
                 type: "json",
                 value: 105486,
                 last_modified_unix: 1754352061.709732,
@@ -278,7 +296,7 @@ document.addEventListener("DOMContentLoaded", function () {
             children: [
               {
                 path: "C:\\Demo\\See All\\Project 3",
-                name: "World Domination.doc",
+                name: "Nircles User Manual.doc",
                 type: "doc",
                 value: 145486,
                 last_modified_unix: 1754352061.709732,
@@ -294,7 +312,7 @@ document.addEventListener("DOMContentLoaded", function () {
               },
               {
                 path: "C:\\Demo\\See All\\Project 3",
-                name: "Report.txt",
+                name: "Folder Summary.ncl",
                 type: "txt",
                 value: 105486,
                 last_modified_unix: 1754352061.709732,
@@ -397,9 +415,10 @@ document.addEventListener("DOMContentLoaded", function () {
     last_modified_iso: "2025-08-11T00:39:34.205280",
   };
 
+
   // Initial load with dummy data
   rootNodeData = defaultData;
-  originalFullData = JSON.parse(JSON.stringify(rootNodeData));
+  window.originalFullData = JSON.parse(JSON.stringify(rootNodeData));
   processAndRenderVisualization(rootNodeData);
   updateBreadcrumbs();
 
@@ -422,8 +441,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (matchesSearch(node)) {
       return JSON.parse(JSON.stringify(node)); // Return a deep copy of the whole branch
     }
-    // Show the reset button
-
     // 2. If the node doesn't match, check if it has children to explore
     if (node.children && node.children.length > 0) {
       // Recursively filter the children
@@ -438,7 +455,6 @@ document.addEventListener("DOMContentLoaded", function () {
         return newNode;
       }
     }
-
     // 4. No match here and no matching descendants
     return null;
   }
@@ -474,6 +490,14 @@ document.addEventListener("DOMContentLoaded", function () {
   //////////////////////////////////////////////////////////////////////////////
   ///////////////////    Event listeners for everything ////////////////////////
   //////////////////////////////////////////////////////////////////////////////
+  //Event listener for "New Scan" button
+  // when we have the scanning functionality, this will trigger the scan and then load the resulting JSON, for now it just loads the default data again.
+  newScanButton.addEventListener("click", function () {
+    // Placeholder for scan functionality
+    displayMessageBox("Scan functionality coming soon! For now, this button reloads the default demo data.", "Info");
+    resetButton.click();
+  });
+
   // Event listener for the "Load JSON File" button
   loadJsonFileButton.addEventListener("click", function () {
     jsonFileLoad.click(); // Trigger the hidden file input click
@@ -487,10 +511,19 @@ document.addEventListener("DOMContentLoaded", function () {
       return; // No file selected
     }
 
+    saveScanButton.addEventListener("click", function () {
+      // placeholder for save functionality - currently just saves the original data loaded.
+     
+      // Export the data as a JSON file
+      displayMessageBox("Save functionality coming soon! For now, this button will download the original data loaded.", "Info");
+    });
+
+
     const reader = new FileReader();
     reader.onload = function (e) {
       try {
         window.rootNodeData = JSON.parse(e.target.result); // Store original root data
+        rootNodeData = JSON.parse(e.target.result); // Set current root data
         processAndRenderVisualization(rootNodeData);
         window.originalFullData = JSON.parse(JSON.stringify(rootNodeData)); // Update the reset function
         searchInput.value = ""; // Clear search on new load
@@ -590,10 +623,8 @@ zoomToNode(currentZoomNode); // Reset zoom to fit the new data
     // Use the Clipboard API
     navigator.clipboard.writeText(fullPath).then(() => {
         // Visual feedback: change button text temporarily
-        const originalText = copyPathButton.textContent;
         copyPathButton.textContent = "Copied!";
-        
-        setTimeout(() => {copyPathButton.textContent = originalText;}, 2000);
+        setTimeout(() => {copyPathButton.textContent = "Copy Path";}, 2000);
     }).catch(err => {
         displayMessageBox("Failed to copy path: " + err, "Error");
     });
@@ -603,6 +634,11 @@ zoomToNode(currentZoomNode); // Reset zoom to fit the new data
   exportPngButton.addEventListener("click", function () {
     exportCanvasAsPNG();
   });
+  // Event listener for Export SVG button
+  exportSvgButton.addEventListener("click", function () {
+    exportAsSVG();
+  });
+
 
   // Event listener for Search input
   searchInput.addEventListener("input", function () {
@@ -619,7 +655,7 @@ drawVisualization(); // Redraw to apply search highlighting
       );
       return;
     }
-    filterString = filterString + searchTerm + ", ";
+    filterString = filterString + "with " + searchTerm + ", ";
     const matchesSearch = (d) => d.name.toLowerCase().includes(searchTerm);
     // Apply the recursive filter to the current rootNodeData
     const filteredData = filterHierarchy(rootNodeData, matchesSearch);
@@ -642,7 +678,7 @@ drawVisualization(); // Redraw to apply search highlighting
       displayMessageBox( "Filter would remove everything", "Filter removed");
       return;
     }
-    filterString = filterString + "Not " + searchTerm + ", ";
+    filterString = filterString + "without  " + searchTerm + ", ";
     const mismatchesSearch = (d) => !d.name.toLowerCase().includes(searchTerm);
     // Apply the recursive filter to the current rootNodeData but invert the match to filter out
     const filteredData = filteroutHierarchy(rootNodeData, mismatchesSearch);
@@ -659,6 +695,12 @@ drawVisualization(); // Redraw to apply search highlighting
     searchTerm = "";
     searchInput.value = "";
   });
+  seeResultsButton.addEventListener("click", function () {
+    displaySearchResultsBox();  
+  });
+  showAboutPageButton.addEventListener("click", function () {
+    displayAboutBox();
+  });
 
 viewSettings.addEventListener("click", function () {
   displaySettingsBox();
@@ -667,7 +709,7 @@ viewSettings.addEventListener("click", function () {
 
   resetButton.addEventListener("click", function () {
     // Restore from the very first loaded dataset
-    rootNodeData = JSON.parse(JSON.stringify(originalFullData));
+    rootNodeData = JSON.parse(JSON.stringify(window.originalFullData));
     resetButton.classList.add("hidden");
       filtered = false;
       filterString = "";
@@ -698,10 +740,49 @@ searchInput.addEventListener('keyup', function (event) {
         }
   }
 });
+  function exportAsSVG() {
+    const svgWidth = canvas.width;
+    const svgHeight = canvas.height;
+    const svg = d3.create("svg")
+      .attr("width", svgWidth)
+      .attr("height", svgHeight);
+
+    const nodesGroup = svg.append("g").attr("class", "nodes");
+
+    currentDataNodes.forEach((node) => {
+      const group = nodesGroup.append("g").attr("transform", `translate(${node.x},${node.y})`);
+
+      group.append("circle")
+        .attr("r", node.r)
+        .attr("fill", getNodeColor(node));
+
+      if (!hideLabels.checked && node.r > 20) {
+        group.append("text")
+          .attr("text-anchor", "middle")
+          .attr("dy", "0.35em")
+          .attr("wrap", "wrap")
+          .attr("font-size", Math.min(12, node.r / 3))
+          .attr("font-family", "Roboto")
+          .attr("fill", "#000")
+          .text(node.data.name);
+      }
+    });
+    const nodeName = currentZoomNode ? currentZoomNode.data.name : "";
+    const rootName = rootNodeData.name;
+    const dateStr = new Date().toISOString().split('T')[0];
+
+    const blob = new Blob([svg.node().outerHTML], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const fileName = `${rootName}-${nodeName}-${dateStr}`.replace(/[^a-z0-9 _-]/gi, '-');
+    link.href = url;
+    link.download = `${fileName}.svg`;
+    link.click();
+  }
 
   function initiateVisuals(data) {
     if (typeof InteractionGraphs === 'function') {
-      new InteractionGraphs(data, '#interaction-graph-container');
+      InteractionGraphs(data, '#interaction-graph-container');
     }
     if (typeof createFolderTree === 'function') {
       createFolderTree(data, '#folder-tree-container');
@@ -738,16 +819,14 @@ searchInput.addEventListener('keyup', function (event) {
     .sum((d) => Math.pow(d.value, ignoreSize.value / 100)) //ignoreSize.checked ?  (d.value / d.value) : +d.value)
     .sort((a, b) => sortItOut(a, b));
     
-    let ratio = (d) => d.value / currentDataNodes[0].value;
     const pack = d3
     .pack()
     .size([containerWidth, containerHeight])
-    //   .padding((d) =>Math.log10(d.value));
     .padding(Math.pow(paddingFactorslider.value / 1200, 2)); //Original value 0.3
     
     currentDataNodes = pack(root).descendants();
     const targetNodes = pack(root).descendants();
-            setColorDomains(); 
+    setColorDomains(); 
 
     targetNodes.forEach((node) => {
       const key = node.data.path + (node.data.name || "");
@@ -785,7 +864,8 @@ searchInput.addEventListener('keyup', function (event) {
 
       // Update the global reference and draw
       currentDataNodes = targetNodes;
-        currentZoomNode = currentDataNodes[0];
+      currentZoomNode = currentDataNodes[0];
+      window.currentZoomNode = currentZoomNode; // Ensure global reference is updated during animation
         //processAndRenderVisualization();
       drawVisualization();
 
@@ -793,6 +873,7 @@ searchInput.addEventListener('keyup', function (event) {
         timer.stop();
         isAnimating = false;
         setColorDomains(); // Refresh legend colors after animation finishes
+        updateSummary(); // Update summary after animation finishes
       }
     });
   }
@@ -803,29 +884,34 @@ searchInput.addEventListener('keyup', function (event) {
   function isOdd(n) {
     return Math.abs(n % 2) == 1;
   }
+  function isaFolder(d) {
+    if (d.data.type === "folder"|| d.data.type === "Folder" || d.data.type === "Directory" || d.data.type === "directory") {
+      return true;
+    } else {
+      return false;
+    }
+  }
   function applyCurrentZoom() {
     // Apply current zoom transform
     ctx.save();
     ctx.translate(transform.x, transform.y);
     ctx.scale(transform.k, transform.k);
   }
-  function updateSummary (){
-    folderSummary.textContent =
-      currentDataNodes[0].data.name +
-      " contains " +
-      currentDataNodes.length +
-      " items. Total size " +
-          formatBytes(currentDataNodes[0].value);
-      if (filtered) {
-    folderSummary.textContent =
-    currentDataNodes[0].data.name +
-    " filtered with " + filterString +
-    " contains " +
-    currentDataNodes.length +
-    " items. Total size " +
-        formatBytes(currentDataNodes[0].value);
+  function updateSummary() {
+    const directories = currentDataNodes.filter((d) => isaFolder(d));
+    const files = currentDataNodes.filter((d) => !isaFolder(d));
+    const ratio = files.length / directories.length;
+    folderSummary.innerHTML = `<div> ${currentDataNodes[0].data.name} contains</div> 
+      <div>${directories.length} folders and ${files.length} files. </div>
+      <div>Total ${currentDataNodes.length} items. Ratio ${ratio.toFixed(2)}</div> 
+      <div>Total size ${formatBytes(currentDataNodes[0].value)} </div>`;
+    if (filtered) {
+      folderSummary.innerHTML = `<div> ${currentDataNodes[0].data.name} filtered ${filterString} contains ${currentDataNodes.length} items. </div>
+      <div>Total size ${formatBytes(currentDataNodes[0].value)} </div>`;
       }
-
+  }
+  function searchHelper(d) {
+    
   }
 
   // Function to draw all circles and text on the canvas
@@ -834,6 +920,7 @@ searchInput.addEventListener('keyup', function (event) {
     ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the entire canvas
     updateSummary ();
     applyCurrentZoom();
+
     // Helper to check if a node matches the search term
     const matchesSearch = (d) => d.data.name.toLowerCase().includes(searchTerm);
     searchCount.textContent = "";
@@ -843,10 +930,12 @@ searchInput.addEventListener('keyup', function (event) {
       searchLogic(matchesSearch);
       filterButton.classList.remove("hidden");
       filterOutButton.classList.remove("hidden");
+      searchSummary.classList.remove("hidden");
     } else {
-      searchResults = "";
+      searchSummary.classList.remove("hidden");
       filterButton.classList.add("hidden");
       filterOutButton.classList.add("hidden");
+      searchResults = "";
       searchCount.textContent = "";
       searchSum.textContent = "";
       updateSearchResults(searchResults);
@@ -854,43 +943,38 @@ searchInput.addEventListener('keyup', function (event) {
 
     // Draw directories first (largest to smallest radius), then files
     const directories = currentDataNodes
-      .filter((d) => d.children)
+      .filter((d) => isaFolder(d))
       .sort((a, b) => b.r - a.r);
     directories.forEach((d) => {
-      if (
+      if ( // Check if the node is within the current viewport before drawing
         d.x - d.r < (canvas.width - transform.x) / transform.k &&
         d.x + d.r > (0 - transform.x) / transform.k &&
         d.y - d.r < (canvas.height - transform.y) / transform.k &&
         d.y + d.r > (0 - transform.y) / transform.k
       ) {
-        if (
+        if ( // Only draw if it's above the minimum radius threshold or matches the search term
           d.r * transform.k > minRadius ||
           (searchTerm.length > 1 && matchesSearch(d))
         ) {
           ctx.beginPath();
           ctx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
           ctx.fillStyle = getNodeColor(d);
-          //ctx.fill();
 
           // Highlight for hover, selection, zoom, or search match
           let strokeColor = "#272730"; // Default black
           let lineWidth = 0.5 / transform.k;
 
-          if (
-            d === hoveredNode
-            ) {
+          if (d === hoveredNode) {
             lineWidth = 4 / transform.k;
           }
-          if (
-            d === selectedNode ||
-            d === currentZoomNode
-          ) {
-            strokeColor = "#ED6631"; // Orange for active states
+          if (d === selectedNode ||
+              d === currentZoomNode) {
+            strokeColor = "#333"; // Orange for active states
             lineWidth = 2.5 / transform.k;
           }
 
           if (searchTerm.length > 1 && matchesSearch(d)) {
-            strokeColor = "#ED6631"; // Orange tint for search match
+            strokeColor = "#222"; // Orange tint for search match
             lineWidth = 5 / transform.k;
           }
 
@@ -913,7 +997,7 @@ searchInput.addEventListener('keyup', function (event) {
     /////////////////////// Draw the Files ///////////////////////////////////
     //////////////////////////////////////////////////////////////////////////
 
-    const files = currentDataNodes.filter((d) => !d.children);
+    const files = currentDataNodes.filter((d) => !isaFolder(d));
     files.forEach((d) => {
       if (
         d.x - d.r < (canvas.width - transform.x) / transform.k &&
@@ -978,21 +1062,22 @@ searchInput.addEventListener('keyup', function (event) {
 
     ///////////////////////////////////////////////// Draw text labels        ///////////////////////////
     
-      currentDataNodes.forEach((d) => {
+ currentDataNodes.forEach((d) => {
       // Text visibility: only show if the node itself is the currentZoomNode,
       // or if its parent is the currentZoomNode, or if no node is zoomed (root view).
       const relSize = 2 * d.r * transform.k;
-      const textStr = d.data.name.toString().split("").join(""); // String length
-      const textFit = (3.14159265 * relSize) / textStr.length;
       const isVisibleInZoom =
-        (currentZoomNode === null && d.depth === 0) || // Show root if not zoomed
-        d === hoveredNode ||   // Anything hovered
-        (d === currentZoomNode || d.parent === currentZoomNode ||
-         d.parent === hoveredNode || d.child === hoveredNode ) &&
-        (1.3 * Math.min(canvas.width, canvas.height) > relSize
-        && textFit > 16); // Visible size range
+        (!hideLabels.checked && currentZoomNode === null && d.depth === 0) || // Show root if not zoomed
+        (!hideLabels.checked &&
+          currentZoomNode !== null &&
+          d === currentZoomNode) || // || (d.parent === currentZoomNode)));
+        (!hideLabels.checked &&
+          d.parent !== null &&
+          //d.parent === currentZoomNode &&
+          1.3 * Math.min(canvas.width, canvas.height) > relSize &&
+          relSize > 100); // Visible size range
 
-      if (!hideLabels.checked && isVisibleInZoom && !isAnimating) {
+      if (isVisibleInZoom && !isAnimating) {
         const text = d.data.name;
         ctx.globalAlpha = 1.0; // Reset opacity
         titleFont = "Roboto, sans-serif";
@@ -1004,20 +1089,41 @@ searchInput.addEventListener('keyup', function (event) {
         if (isEven(d.depth)) {
           textangle = -30;
         }
-
-        //Create Text
-        var fontSize = 13.5 / transform.k;
-        var tradius = d.r * 0.8;
-        if (d === currentZoomNode) {
-          fontSize = fontSize * 1.5;
-        }
+        //Folder Text
         if (d.children) {
-          fontSize = 1.2 * fontSize;
-          tradius = d.r * 1.01;
+          var fontSizeTitle = 18 / (transform.k * 1.2);
+          if (d === currentZoomNode) {
+            fontSizeTitle = fontSizeTitle * 2;
           }
           var mainTextColor = [74, 74, 74]; //"#4A4A4A",
           ctx.fillStyle = "#00000e";
-        drawCircularText(ctx, text, fontSize, titleFont, d.x, d.y, tradius, textangle, 0,); //Text for Files
+          drawCircularText(
+            ctx,
+            text,
+            fontSizeTitle,
+            titleFont,
+            d.x,
+            d.y,
+            d.r,
+            textangle,
+            0,
+          ); //Text for Folders
+        } else {
+          var fontSize = 12 / transform.k;
+          //if (d.parent === currentZoomNode || d === currentZoomNode) {
+          drawFileText(
+            ctx,
+            text,
+            fontSize,
+            titleFont,
+            d.x,
+            d.y,
+            d.r * 0.75,
+            0,
+            0,
+          ); //Text for Files
+          //}
+        }
       }
     });
     ctx.restore(); // Restore context to original state
@@ -1032,7 +1138,7 @@ searchInput.addEventListener('keyup', function (event) {
       thisSum = thisSum + d.value;
     });
 
-    searchCount.textContent = match;
+    searchCount.textContent = match + " items";
     searchSum.textContent = formatBytes(thisSum);
     //White background if searching for something
     ctx.beginPath();
@@ -1051,6 +1157,59 @@ searchInput.addEventListener('keyup', function (event) {
     updateSearchResults(searchResults);
   }
 
+  /////////////////////////////////////////////////
+  /// Regular text with text wrap and wordwrap ////
+  /////////////////////////////////////////////////
+
+  function drawFileText(
+    ctx,
+    text,
+    fontSize,
+    titleFont,
+    centerX,
+    centerY,
+    radius,
+  ) {
+    ctx.strokeStyle = "white";
+    ctx.lineJoin = "circle";
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "center"; // Ensure we draw in exact center
+    ctx.fillStyle = "rgb(25,25,25)";
+
+    //text = text.toString();
+    text = wrapText(ctx, text, radius * 2);
+    ctx.font = fontSize + "px " + titleFont;
+
+    ctx.save(); //Save the default state before doing any transformations
+    ctx.translate(centerX, centerY); // Move to center
+    for (var i = 0; i < text.length; i++) {
+      //ctx.strokeText(text[i], 0, i*fontSize);
+      ctx.fillText(text[i], 0, (i - text.length / 2 + 1) * fontSize);
+    }
+    ctx.restore(); //Restore to state as it was before transformations
+  }
+
+  function wrapText(ctx, text, maxWidth) {
+    var lines = [];
+    var letterLines = [];
+    var words = text.split(/[-_ ]/);
+    var currentLine = words[0];
+
+    for (var i = 1; i < words.length; i++) {
+      var word = words[i];
+      var width = ctx.measureText(currentLine + " " + word).width;
+      if (width < maxWidth) {
+        currentLine += " " + word;
+      } else {
+        lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    lines.push(currentLine);
+
+  
+    return lines;
+  }
   //////////////////////////////////////////////////////////////
   ////////////////////  Circular Text  /////////////////////////
   //////////////////////////////////////////////////////////////
@@ -1177,11 +1336,11 @@ searchInput.addEventListener('keyup', function (event) {
     const fileTypes = Array.from(
       new Set(
         currentDataNodes
-          .filter((d) => !d.children && d.data.type)
+          .filter((d) => !isaFolder(d) && d.data.type)
           .map((d) => d.data.type),
       ),
     );
-    fileTypeColorScale.domain(fileTypes);
+    categoricalColorScale.domain(fileTypes);
 
     const allDates = currentDataNodes
       .filter((d) => d.data.last_modified_unix)
@@ -1192,22 +1351,22 @@ searchInput.addEventListener('keyup', function (event) {
 
 
     const chosenDate = maxDate - (dateCutoff.value / 100) * dateRange;
-    dateColorScale2.domain([minDate, maxDate]);
-    dateColorScale1.domain([chosenDate, maxDate]);
+    linearBWColorScale2.domain([minDate, maxDate]);
+    linearBWColorScale1.domain([chosenDate, maxDate]);
 
     const allFileSizes = currentDataNodes
-      .filter((d) => !d.children)
+      .filter((d) => !isaFolder(d))
       .map((d) => d.value);
     const minFileSize = d3.min(allFileSizes) || 0;
     const maxFileSize = d3.max(allFileSizes) || 1; // Avoid division by zero
-    fileSizeColorScale.domain([minFileSize, maxFileSize]);
+    exponentialColorScale.domain([minFileSize, maxFileSize]);
 
     const allFileDepths = currentDataNodes
-      .filter((d) => !d.children)
+      .filter((d) => !isaFolder(d))
       .map((d) => d.depth);
     const minFileDepth = d3.min(allFileDepths);
     const maxFileDepth = d3.max(allFileDepths);
-    fileDepthColorScale.domain([0, 5]);
+    linearRainbowColorScale.domain([0, 5]);
 
     // Update legend labels
     minDateLabel.textContent = minDate
@@ -1231,19 +1390,19 @@ searchInput.addEventListener('keyup', function (event) {
   function getNodeColor(d) {
     const colorMode = colorBySelect.value;
     if (colorMode === "depth") {
-      return fileDepthColorScale(d.depth);
+      return linearRainbowColorScale(d.depth);
     } else if (colorMode === "date") {
       if (d.data.last_modified_unix) {
-        return dateColorScale1(d.data.last_modified_unix); // Default grey if no date
+        return linearBWColorScale1(d.data.last_modified_unix); // Default grey if no date
       }
     } else if (colorMode === "fileSize") {
-      return fileSizeColorScale(d.value); //Files also show size
+      return exponentialColorScale(d.value); //Files also show size
     } else {
-      if (!d.children) {
+      if (!isaFolder(d)) {
         // It's a directory (folder)
-        return fileTypeColorScale(d.data.type);
+        return categoricalColorScale(d.data.type);
       }
-      return fileSizeColorScale(d.value); // Directories always show gradient
+      return exponentialColorScale(d.value); // Directories always show gradient
     }
     return "#fd4f0aff"; // Fallback default color
   }
@@ -1427,6 +1586,7 @@ function exportCanvasAsPNG() {
 
     if (foundNode !== hoveredNode) {
       hoveredNode = foundNode;
+      window.hoveredNode = hoveredNode; // Store hovered node in global variable for access in other functions
       drawVisualization();
       // Redraw to update hover highlight  <br/>Sub-items: ${hoveredNode.children.length}
       // <br/>Type: ${hoveredNode.data.type || "Folder"}
@@ -1488,6 +1648,7 @@ function exportCanvasAsPNG() {
   // Event listener for mouse leaving canvas
   canvas.addEventListener("mouseout", function () {
     if (hoveredNode) {
+      window.hoveredNode = null;
       hoveredNode = null;
       drawVisualization(); // Redraw to remove hover highlight
       tooltip.style("opacity", 0);
@@ -1543,28 +1704,38 @@ function exportCanvasAsPNG() {
   });
 
   function selectedNodeDetails(node) {
-    detailName.textContent = node.data.name;
-    detailType.textContent = node.data.type || "Folder";
+    if(typeof window.selectedNodeInTree === 'function') {
+      window.selectedNodeInTree(node);
+    }
+    selectedNode = node;
+    detailName.textContent = selectedNode.data.name;
+    detailType.textContent = selectedNode.data.type || "Folder";
     // Display details in the third column
       selectedItemDetails.classList.remove("hidden");
       copyPathButton.classList.remove("hidden");
       initialDetailsPrompt.classList.add("hidden");
 
-      if (node.data.type === "Folder") {
+      if (selectedNode.data.type === "Folder" || selectedNode.data.type === "folder") {
         detailChildren.textContent =
-          selectedNode.data.children.length + " Children";
+          selectedNode.descendants().length + " total";
+        
+    const directories = selectedNode.descendants().filter((d) => isaFolder(d));
+    const files = selectedNode.descendants().filter((d) => !isaFolder(d));
+    const ratio = files.length / directories.length;
+    detailChildren.innerHTML = `${directories.length} folders and ${files.length} files.
+      <div>Total ${currentDataNodes.length} items. Ratio ${ratio.toFixed(2)}</div> `;
       } else {
         detailChildren.textContent = "";
       }
-      detailSize.textContent = formatBytes(node.value);
-      detailLastModified.textContent = node.data.last_modified_iso
-        ? new Date(node.data.last_modified_unix * 1000).toLocaleString()
+      detailSize.textContent = formatBytes(selectedNode.value);
+      detailLastModified.textContent = selectedNode.data.last_modified_iso
+        ? new Date(selectedNode.data.last_modified_unix * 1000).toLocaleString()
         : "N/A";
-      if (node.data.children) {
+      if (selectedNode.data.children) {
         detailPath.textContent = node.data.path;
       } else {
         detailPath.textContent =
-          node.data.path + "\\" + node.data.name;
+          selectedNode.data.path + "\\" + selectedNode.data.name;
       }
   }
 
@@ -1580,16 +1751,15 @@ function exportCanvasAsPNG() {
 
   //Function to create search results
   function updateSearchResults(searchResults) {
-    searchItems.classList.add("hidden");
     let searchArray = [];
 
     if (searchTerm.length > 1) {
-      //initialSearchPrompt.classlist.add('hidden');
       searchItems.classList.remove("hidden");
       searchItems.innerHTML = ""; // Clear previous search items
 
       // Add items for search results
       searchResults.forEach((path) => {
+        searchSummary.classList.remove("hidden");
         const resultItem = document.createElement("div");
         resultItem.className = "search-result-item";
         resultItem.innerHTML = `<div> ${path.data.name} </div>`;
@@ -1598,8 +1768,7 @@ function exportCanvasAsPNG() {
         searchItems.appendChild(resultItem);
       });
     } else {
-      //initialSearchPrompt.classlist.remove('hidden');
-      searchItems.classList.add("hidden");
+      searchSummary.classList.add("hidden");
     }
   }
 
@@ -1615,7 +1784,6 @@ function exportCanvasAsPNG() {
 
     if (colorMode === "type") {
       typeLegendItems.classList.remove("hidden");
-      //typeLegendItems.innerHTML = ""; // Clear previous legend items
 
       // Add legend item for folders (default gray)
       // const folderLegendItem = document.createElement("div");
@@ -1631,7 +1799,7 @@ function exportCanvasAsPNG() {
       //   const legendItem = document.createElement("div");
       //   legendItem.className = "legend-item";
       //   legendItem.innerHTML = `
-      //                   <span class="w-4 h-4 rounded-full" style="background-color: ${fileTypeColorScale(type)};"></span>
+      //                   <span class="w-4 h-4 rounded-full" style="background-color: ${categoricalColorScale(type)};"></span>
       //                       <span>.${type}</span>
       //                   `;
       //   typeLegendItems.appendChild(legendItem);
@@ -1674,6 +1842,24 @@ function exportCanvasAsPNG() {
     document.getElementById("viewSettingsMenu").classList.add("hidden");
       });
   }
+  function displayAboutBox() {
+    document.getElementById("aboutPopup").classList.remove("hidden");
+    
+    document
+      .getElementById("closeAboutBox")
+      .addEventListener("click", function () {
+    document.getElementById("aboutPopup").classList.add("hidden");
+      });
+  }
+  function displaySearchResultsBox() {
+    document.getElementById("searchPopup").classList.remove("hidden");
+    
+    document
+      .getElementById("closeSearchResultsBox")
+      .addEventListener("click", function () {
+    document.getElementById("searchPopup").classList.add("hidden");
+      });
+  }
 
 
   // Add a resize observer to redraw the canvas when its container changes size
@@ -1682,7 +1868,7 @@ function exportCanvasAsPNG() {
       if (entry.target === visualizationColumn) {
         const newWidth = entry.contentRect.width;
         // Set new height relative to window height, capped by newWidth for square aspect
-        const newHeight = Math.min(newWidth, window.innerHeight * 0.8);
+        const newHeight =Math.min(newWidth, window.innerHeight * 0.8);
 
         if (canvas.width !== newWidth || canvas.height !== newHeight) {
           canvas.width = newWidth;
