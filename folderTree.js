@@ -76,14 +76,14 @@ function createFolderTree(data, containerSelector) {
 
   root.x0 = 0;
   root.y0 = 0;
-  // if (root.children) {
-  //   root.children.forEach(collapse);
-  // }
+  if (root.children) {
+    root.children.forEach(collapse);
+  }
   update(root);
 
   // Toggle children on click.
-    function click(event, d) {
-    highlightNodeInTree(d);
+  function click(event, d) {
+    // Toggle children locally
     if (d.children) {
         d._children = d.children;
         d.children = null;
@@ -92,6 +92,8 @@ function createFolderTree(data, containerSelector) {
         d._children = null;
     }
     update(d);
+    // Notify main application
+    if (window.treeSelectNode) window.treeSelectNode(d);
 }
 
   function update(source) {
@@ -135,9 +137,16 @@ function createFolderTree(data, containerSelector) {
       .attr("transform", (d) => `translate(${source.y0},${source.x0})`)
       .attr("fill-opacity", 0)
       .attr("stroke-opacity", 0)
-        .on("click", (event, d) => {
-            click(event, d)
+      .on("click", click);
+      
+    nodeEnter
+        .on("mouseover", (event, d) => {
+            if (window.treeHoverNode) window.treeHoverNode(d);
+        })
+        .on("mouseout", (event, d) => {
+            if (window.treeHoverNode) window.treeHoverNode(null);
         });
+
       nodeEnter.append("circle")
         .attr("r", 2.5)
         .attr("fill", "#FFF")
@@ -208,35 +217,64 @@ function createFolderTree(data, containerSelector) {
   });
 
     }
-    if (typeof window.selectedNode === 'function') {
-        window.selectedNode(selectedNode);
-      }
 
   // This function will be called from NirclesScript.js
   window.highlightNodeInTree = (node) => {
-    // First, reset any currently selected node
-    gNode.selectAll("text").attr("font-weight", "normal").attr("fill", "black");
+    if (!node) return;
 
-    // Find the node in the tree that corresponds to the path
-      const targetNode = node;
-      const targetPath = targetNode.ancestors().reverse(); // Get ancestors from root to the target node
-      const nodePath = targetNode.data.path;
-      const nodeName = targetNode.data.name;
-    
-      if (targetPath) {
-          gNode.selectAll("g")
-              .filter(d => d.data.path === nodePath && d.data.name === nodeName)
+    // Recursive search to find node even if hidden in _children
+    function findNodeRecursive(d, path) {
+        if (d.data.path === path) return d;
+        // Check both visible and hidden children
+        const kids = d.children || d._children;
+        if (kids) {
+            for (const child of kids) {
+                const found = findNodeRecursive(child, path);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    const targetInTree = findNodeRecursive(root, node.data.path);
+
+    // 2. Update tree state: Expand path to target, collapse others
+    if (targetInTree) {
+        const ancestors = new Set();
+        let current = targetInTree.parent;
+        while (current) {
+            ancestors.add(current);
+            current = current.parent;
+        }
+
+        function updateStateRecursive(d) {
+            if (ancestors.has(d)) {
+                // Ancestor: ensure expanded
+                if (d._children) {
+                    d.children = d._children;
+                    d._children = null;
+                }
+                if (d.children) d.children.forEach(updateStateRecursive);
+            } else if (d === targetInTree) {
+                // Target: leave state as is (respects manual toggle)
+            } else {
+                // Other: collapse
+                if (d.children) {
+                    d._children = d.children;
+                    d.children = null;
+                }
+            }
+        }
+        updateStateRecursive(root);
+        update(root);
+
+        // 3. Highlight text
+        gNode.selectAll("text").attr("font-weight", "normal").attr("fill", "white");
+        gNode.selectAll("g")
+              .filter(d => d.data.path === targetInTree.data.path)
               .select("text")
               .attr("font-weight", "bold")
               .attr("fill", "#ce59f7");
-          //targetNode.ancestors().reverse().forEach(ancestor => {
-          //    gNode.selectAll("g")
-          //        .filter(d => d === ancestor)
-          //        .select("text")
-          //        .attr("font-weight", "bold")
-          //        .attr("fill", "#ce59f7");
-          //});
-          }
-    update(node);
+    }
   };
 }

@@ -43,15 +43,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const ignoreSize = document.getElementById("ignoreSize");
   const hideLabels = document.getElementById("hideLabels");
   const hexagonalFiles = document.getElementById("hexagonalFiles");
-  const typeLegendItems = document.getElementById("typeLegendItems");
-  const dateLegendItems = document.getElementById("dateLegendItems");
-  const depthLegendItems = document.getElementById("depthLegendItems");
-  const fileSizeLegendItems = document.getElementById("fileSizeLegendItems");
-  const minDateLabel = document.getElementById("minDateLabel");
-  const midDateLabel = document.getElementById("midDateLabel");
-  const maxDateLabel = document.getElementById("maxDateLabel");
-  const minFileSizeLabel = document.getElementById("minFileSizeLabel");
-  const maxFileSizeLabel = document.getElementById("maxFileSizeLabel");
  
   const folderSummary = document.getElementById("folderSummary"); //Global Folder Summary
   const breadcrumbsDiv = document.getElementById("breadcrumbs"); // New Breadcrumbs div
@@ -126,6 +117,14 @@ document.addEventListener("DOMContentLoaded", function () {
     .scaleLinear()
     .range(["#000000", "#ebebeb"]); // Shades of black white and orange for file and folder date
   const linearBWColorScale2 = d3.scaleLinear().range(["#009900", "#F2EFEC"]); // Shades of green and white for folder depth
+
+  window.categoricalColorScale = categoricalColorScale;
+  window.exponentialColorScale = exponentialColorScale;
+  window.linearRainbowColorScale = linearRainbowColorScale;
+  window.linearBWColorScale1 = linearBWColorScale1;
+  window.drawVisualization = drawVisualization;
+  window.currentFilterFunction = null;
+  window.currentFilterDescription = null;
 
  // Dummy Data
   const defaultData = {
@@ -420,19 +419,21 @@ document.addEventListener("DOMContentLoaded", function () {
   rootNodeData = defaultData;
   window.originalFullData = JSON.parse(JSON.stringify(rootNodeData));
   processAndRenderVisualization(rootNodeData);
+  // zoomToNode(rootNodeData);
   updateBreadcrumbs();
 
   // D3 Zoom behavior
   const zoom = d3
     .zoom()
-    .scaleExtent([0.01, 1000]) // Allow zooming from 10% to 10000%
+    .scaleExtent([0.005, 1000]) 
     .on("zoom", (event) => {
       transform = event.transform;
       drawVisualization();
+      drawHighlights(); // Sync overlay with zoom
     });
 
   // Apply zoom behavior to the canvas
-  d3.select(canvas).call(zoom);
+  //d3.select(canvas).call(zoom);
 
  
     function filterHierarchy(node, matchesSearch) {
@@ -533,6 +534,8 @@ document.addEventListener("DOMContentLoaded", function () {
         resetButton.classList.add("hidden");
         filtered = false;
         filterString = "";
+        window.currentFilterFunction = null; // Clear any graph filters
+        window.currentFilterDescription = null; 
         updateBreadcrumbs();
         initiateVisuals(rootNodeData);
 
@@ -553,6 +556,9 @@ document.addEventListener("DOMContentLoaded", function () {
   if (colorBySelect) {
     colorBySelect.addEventListener("change", function () {
       if (currentDataNodes.length > 0) {
+        window.currentFilterFunction = null;
+        window.currentFilterDescription = null;
+        initiateVisuals(rootNodeData);
         processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
         drawVisualization(); // Re-draw with new color scheme
       }
@@ -564,14 +570,14 @@ document.addEventListener("DOMContentLoaded", function () {
     sortBySelect.addEventListener("change", function () {
       processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
           initiateVisuals(rootNodeData);
-zoomToNode(currentZoomNode); // Reset zoom to fit the new data
+zoomToNode(currentZoomNode); 
     });
   }
   // Event listener for sorting criteria change
   if (hideLabels) {
     hideLabels.addEventListener("change", function () {
       processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-      zoomToNode(currentZoomNode); // Reset zoom to fit the new data
+      zoomToNode(currentZoomNode);
     });
   }
 
@@ -579,7 +585,7 @@ zoomToNode(currentZoomNode); // Reset zoom to fit the new data
   if (hexagonalFiles) {
   hexagonalFiles.addEventListener("change", function () {
     processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-    zoomToNode(currentZoomNode); // Reset zoom to fit the new data
+    zoomToNode(currentZoomNode);
   });
   }
 
@@ -587,21 +593,21 @@ zoomToNode(currentZoomNode); // Reset zoom to fit the new data
   if (paddingFactorslider) {
   paddingFactorslider.addEventListener("input", function () {
     processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-    zoomToNode(currentZoomNode); // Reset zoom to fit the new data
+    zoomToNode(currentZoomNode); 
   });
   }
 
   // Event listener for date colour criteria input
   dateCutoff.addEventListener("input", function () {
     processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-    zoomToNode(currentZoomNode); // Reset zoom to fit the new data
+    zoomToNode(currentZoomNode); 
   });
 
   // Event listener for file size criteria change
   if (ignoreSize) {
     ignoreSize.addEventListener("input", function () {
       processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-      zoomToNode(currentZoomNode); // Reset zoom to fit the new data
+      zoomToNode(currentZoomNode); 
     });
   } else {
     ignoreSize.value = 100;
@@ -648,15 +654,33 @@ drawVisualization(); // Redraw to apply search highlighting
   });
 
    filterButton.addEventListener("click", function () {
-    if (searchTerm.length < 2) {
+    const hasGraphFilter = window.currentFilterFunction !== null;
+    if (searchTerm.length < 2 && !hasGraphFilter) {
       displayMessageBox(
         "Please enter a search term to filter.",
         "Filter would remove everything",
       );
       return;
     }
-    filterString = filterString + "with " + searchTerm + ", ";
-    const matchesSearch = (d) => d.name.toLowerCase().includes(searchTerm);
+    
+    let desc = "";
+    if (searchTerm.length >= 2) desc += `"${searchTerm}"`;
+    if (hasGraphFilter && window.currentFilterDescription) {
+        if (desc) desc += " and ";
+        desc += window.currentFilterDescription;
+    }
+    
+    filterString = filterString + (filterString ? " | " : "") + "Filtered with " + desc;
+    
+    const matchesSearch = (d) => {
+        const term = searchTerm.toLowerCase();
+        const nameMatch = term.length < 2 || d.name.toLowerCase().includes(term);
+        // Allow folders to pass the graph filter check so traversal continues.
+        // The drawing loop will hide specific files that don't match.
+        const isFolder = d.children && d.children.length > 0;
+        const graphMatch = !window.currentFilterFunction || isFolder || window.currentFilterFunction(d);
+        return nameMatch && graphMatch;
+    };
     // Apply the recursive filter to the current rootNodeData
     const filteredData = filterHierarchy(rootNodeData, matchesSearch);
 
@@ -674,12 +698,35 @@ drawVisualization(); // Redraw to apply search highlighting
    });
   
   filterOutButton.addEventListener("click", function () {
-    if (searchTerm.length < 2) {
+    const hasGraphFilter = window.currentFilterFunction !== null;
+    if (searchTerm.length < 2 && !hasGraphFilter) {
       displayMessageBox( "Filter would remove everything", "Filter removed");
       return;
     }
-    filterString = filterString + "without  " + searchTerm + ", ";
-    const mismatchesSearch = (d) => !d.name.toLowerCase().includes(searchTerm);
+
+    let desc = "";
+    if (searchTerm.length >= 2) desc += `"${searchTerm}"`;
+    if (hasGraphFilter && window.currentFilterDescription) {
+        if (desc) desc += " and ";
+        desc += window.currentFilterDescription;
+    }
+    filterString = filterString + (filterString ? " | " : "") + "Filtered without " + desc;
+
+    const mismatchesSearch = (d) => {
+        const term = searchTerm.toLowerCase();
+        // We want to KEEP things that do NOT match the search term
+        // But we must also respect the graph filter (keep things that DO match the graph)
+        // Folders must pass the graph filter check to ensure we don't prune the tree root.
+        const isFolder = d.children && d.children.length > 0;
+        
+        if (term.length >= 2) {
+             // Standard: Remove text matches, but keep items within the graph selection
+             return !d.name.toLowerCase().includes(term) && (!window.currentFilterFunction || isFolder || window.currentFilterFunction(d));
+        } else {
+             // No text search: Invert the graph selection (Remove what is brushed)
+             return isFolder || !window.currentFilterFunction || !window.currentFilterFunction(d);
+        }
+    };
     // Apply the recursive filter to the current rootNodeData but invert the match to filter out
     const filteredData = filteroutHierarchy(rootNodeData, mismatchesSearch);
 
@@ -732,7 +779,7 @@ searchInput.addEventListener('keyup', function (event) {
         } else {
           filterButton.click();
         }
-      } else if (currentSearch.length === 0) {
+      } else if (currentSearch.length === 0 && !window.currentFilterFunction) {
             // If they hit enter on an empty box, reset the view
             resetButton.click();
         } else {
@@ -740,6 +787,11 @@ searchInput.addEventListener('keyup', function (event) {
         }
   }
 });
+
+// //////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////
   function exportAsSVG() {
     const svgWidth = canvas.width;
     const svgHeight = canvas.height;
@@ -922,11 +974,20 @@ searchInput.addEventListener('keyup', function (event) {
     applyCurrentZoom();
 
     // Helper to check if a node matches the search term
-    const matchesSearch = (d) => d.data.name.toLowerCase().includes(searchTerm);
+    const matchesSearch = (d) => {
+        const term = searchTerm.toLowerCase();
+        const nameMatch = term.length < 2 || d.data.name.toLowerCase().includes(term);
+        const graphMatch = !window.currentFilterFunction || window.currentFilterFunction(d.data);
+        return nameMatch && graphMatch;
+    };
+
     searchCount.textContent = "";
     searchSum.textContent = "";
 
-    if (searchTerm.length > 1) {
+    // Determine if any filtering is active (Search text OR Graph brush)
+    const isFiltering = searchTerm.length > 1 || window.currentFilterFunction !== null;
+
+    if (isFiltering) {
       searchLogic(matchesSearch);
       filterButton.classList.remove("hidden");
       filterOutButton.classList.remove("hidden");
@@ -954,37 +1015,37 @@ searchInput.addEventListener('keyup', function (event) {
       ) {
         if ( // Only draw if it's above the minimum radius threshold or matches the search term
           d.r * transform.k > minRadius ||
-          (searchTerm.length > 1 && matchesSearch(d))
+          (isFiltering && matchesSearch(d))
         ) {
           ctx.beginPath();
           ctx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
           ctx.fillStyle = getNodeColor(d);
 
           // Highlight for hover, selection, zoom, or search match
-          let strokeColor = "#272730"; // Default black
+          let strokeColor = "#111"; // Default black
           let lineWidth = 0.5 / transform.k;
 
           if (d === hoveredNode) {
+           strokeColor = "#ffa135"; // Orange highlight
             lineWidth = 4 / transform.k;
           }
           if (d === selectedNode ||
               d === currentZoomNode) {
-            strokeColor = "#333"; // Orange for active states
-            lineWidth = 2.5 / transform.k;
+            strokeColor = "#ff7e27"; // Orange for active states
+            lineWidth = 5 / transform.k;
           }
 
-          if (searchTerm.length > 1 && matchesSearch(d)) {
-            strokeColor = "#222"; // Orange tint for search match
-            lineWidth = 5 / transform.k;
+          if (isFiltering && matchesSearch(d)) {
+            strokeColor = "#ff8800"; // Orange tint for search match
+            lineWidth = 2.5 / transform.k;
           }
 
           ctx.strokeStyle = strokeColor;
           ctx.lineWidth = lineWidth;
-          //ctx.stroke();
 
           ctx.globalAlpha = 1.0; // Reset opacity
           // Dim non-matching nodes if a search term is active
-          if (searchTerm.length > 1 && !matchesSearch(d)) {
+          if (isFiltering && !matchesSearch(d)) {
             ctx.globalAlpha = 0.12; // Reduce opacity
           }
           ctx.fill();
@@ -1007,7 +1068,7 @@ searchInput.addEventListener('keyup', function (event) {
       ) {
         if (
           d.r * transform.k > minRadius ||
-          (searchTerm.length > 1 && matchesSearch(d))
+          (isFiltering && matchesSearch(d))
         ) {
 
           if (!hexagonalFiles.checked){
@@ -1032,15 +1093,15 @@ searchInput.addEventListener('keyup', function (event) {
           ctx.fillStyle = getNodeColor(d);
 
           // Highlight for hover, selection, zoom, or search match
-          let strokeColor = "#ffffff"; // Default file white
-          let lineWidth = 0.4 / transform.k;
+          let strokeColor = "#fff"; // Default file white
+          let lineWidth = 0.5 / transform.k;
 
           if (d === hoveredNode || d === selectedNode) {
-            //strokeColor = "#ED6631"; // Orange for active states
-            lineWidth = 4 / transform.k;
+            //strokeColor = "#ffa135"; // Orange for active states
+            lineWidth = 2.5 / transform.k;
           }
 
-          if (searchTerm.length > 1 && matchesSearch(d)) {
+          if (isFiltering && matchesSearch(d)) {
             strokeColor = "#ED6631"; // Orange tint for search match
             lineWidth = 5 / transform.k;
           }
@@ -1051,7 +1112,7 @@ searchInput.addEventListener('keyup', function (event) {
 
           ctx.globalAlpha = 1.0; // Reset opacity
           // Dim non-matching nodes if a search term is active
-          if (searchTerm.length > 1 && !matchesSearch(d)) {
+          if (isFiltering && !matchesSearch(d)) {
             ctx.globalAlpha = 0.12; // Reduce opacity
           }
           ctx.fill();
@@ -1063,8 +1124,6 @@ searchInput.addEventListener('keyup', function (event) {
     ///////////////////////////////////////////////// Draw text labels        ///////////////////////////
     
  currentDataNodes.forEach((d) => {
-      // Text visibility: only show if the node itself is the currentZoomNode,
-      // or if its parent is the currentZoomNode, or if no node is zoomed (root view).
       const relSize = 2 * d.r * transform.k;
       const isVisibleInZoom =
         (!hideLabels.checked && currentZoomNode === null && d.depth === 0) || // Show root if not zoomed
@@ -1082,7 +1141,7 @@ searchInput.addEventListener('keyup', function (event) {
         ctx.globalAlpha = 1.0; // Reset opacity
         titleFont = "Roboto, sans-serif";
         // Dim non-matching nodes if a search term is active
-        if (searchTerm.length > 1 && !matchesSearch(d)) {
+        if (isFiltering && !matchesSearch(d)) {
           ctx.globalAlpha = 0.12; // Reduce opacity
         }
         let textangle = 30;
@@ -1127,6 +1186,42 @@ searchInput.addEventListener('keyup', function (event) {
       }
     });
     ctx.restore(); // Restore context to original state
+  }
+
+  // New function to draw ONLY the dynamic highlights on the overlay
+  function drawHighlights() {
+    overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    if (!hoveredNode) return;
+
+    overlayCtx.save();
+    overlayCtx.translate(transform.x, transform.y);
+    overlayCtx.scale(transform.k, transform.k);
+
+    const d = hoveredNode;
+    
+    // Draw highlight stroke
+    overlayCtx.beginPath();
+    overlayCtx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
+    overlayCtx.strokeStyle = "#ffa135";
+    overlayCtx.lineWidth = 4 / transform.k;
+    overlayCtx.stroke();
+
+    // Draw label on top
+    const titleFont = "Roboto, sans-serif";
+    const text = d.data.name;
+    let textangle = 30;
+    if (isEven(d.depth)) textangle = -30;
+
+    if (d.children) {
+        var fontSizeTitle = 18 / (transform.k * 1.2);
+        if (d === currentZoomNode) fontSizeTitle = fontSizeTitle * 2;
+        drawCircularText(overlayCtx, text, fontSizeTitle, titleFont, d.x, d.y, d.r, textangle, 0);
+    } else {
+        var fontSize = 14 / transform.k;
+        drawCircularText(overlayCtx, text, fontSize, titleFont, d.x, d.y, d.r * 0.75, 0, 0);
+    }
+
+    overlayCtx.restore();
   }
 
   // Search functionality
@@ -1312,6 +1407,40 @@ searchInput.addEventListener('keyup', function (event) {
     }
     }
   }
+
+  // --- Bridge Functions for Folder Tree Interaction ---
+  
+  window.treeHoverNode = (treeNode) => {
+      if (!treeNode) {
+          hoveredNode = null;
+          window.hoveredNode = null;
+      } else {
+          // Find matching node in the current visualization data
+          const match = currentDataNodes.find(d => d.data.path === treeNode.data.path);
+          if (match) {
+              hoveredNode = match;
+              window.hoveredNode = match;
+          }
+      }
+      drawVisualization();
+  };
+
+  window.treeSelectNode = (treeNode) => {
+      const match = currentDataNodes.find(d => d.data.path === treeNode.data.path);
+      if (match) {
+           // Trigger selection logic (simulating a click on the bubble)
+           window.selectedNode = match;
+           selectedNode = match;
+           zoomToNode(match);
+           selectedNodeDetails(match);
+           
+           // Sync back to tree (collapses others, highlights this one)
+           if(typeof window.highlightNodeInTree === 'function') window.highlightNodeInTree(match);
+           
+           drawVisualization();
+      }
+  };
+
   // Function to sort based on selected option
   function sumItOut(d) {
     const sortMode = sortBySelect.value;
@@ -1367,23 +1496,8 @@ searchInput.addEventListener('keyup', function (event) {
     const minFileDepth = d3.min(allFileDepths);
     const maxFileDepth = d3.max(allFileDepths);
     linearRainbowColorScale.domain([0, 5]);
+    updateGraphVisibility();
 
-    // Update legend labels
-    minDateLabel.textContent = minDate
-      ? new Date(minDate * 1000).toLocaleDateString()
-      : "";
-    maxDateLabel.textContent = maxDate
-      ? new Date(maxDate * 1000).toLocaleDateString()
-      : "";
-    minFileSizeLabel.textContent = minFileSize
-      ? formatBytes(minFileSize)
-      : "Smallest";
-    maxFileSizeLabel.textContent = maxFileSize
-      ? formatBytes(maxFileSize)
-      : "Largest";
-    maxDepthLabel.textContent = maxFileDepth;
-
-    updateColorLegend(fileTypes);
   }
 
   // Function to get color based on selected option
@@ -1407,11 +1521,27 @@ searchInput.addEventListener('keyup', function (event) {
     return "#fd4f0aff"; // Fallback default color
   }
 
+  function updateGraphVisibility() {
+    const typeLegendItems = document.getElementById("typeLegendItems");
+    const dateLegendItems = document.getElementById("dateLegendItems");
+    const depthLegendItems = document.getElementById("depthLegendItems");
+    const fileSizeLegendItems = document.getElementById("fileSizeLegendItems");
+    
+    [typeLegendItems, dateLegendItems, depthLegendItems, fileSizeLegendItems].forEach(el => {
+      if(el) el.classList.add("hidden");
+    });
+
+    if (colorBySelect.value === "type" && typeLegendItems) typeLegendItems.classList.remove("hidden");
+    else if (colorBySelect.value === "date" && dateLegendItems) dateLegendItems.classList.remove("hidden");
+    else if (colorBySelect.value === "depth" && depthLegendItems) depthLegendItems.classList.remove("hidden");
+    else if (colorBySelect.value === "fileSize" && fileSizeLegendItems) fileSizeLegendItems.classList.remove("hidden");
+  }
+
   function zoomToNode(node) {
     const width = canvas.width;
     const height = canvas.height;
     
-    const k = Math.min(width, height) / (node.r * 2.4);
+    const k = Math.min(width, height) / (node.r * 2.125);
     const tx = width / 2 - node.x * k;
     const ty = height / 2 - node.y * k;
     
@@ -1748,12 +1878,14 @@ function exportCanvasAsPNG() {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
   }
+  window.formatBytes = formatBytes;
 
   //Function to create search results
   function updateSearchResults(searchResults) {
-    let searchArray = [];
+    const hasGraphFilter = window.currentFilterFunction !== null;
 
-    if (searchTerm.length > 1) {
+    // Show results if we have a valid text search OR a graph filter active
+    if (searchTerm.length > 1 || hasGraphFilter) {
       searchItems.classList.remove("hidden");
       searchItems.innerHTML = ""; // Clear previous search items
 
@@ -1769,47 +1901,6 @@ function exportCanvasAsPNG() {
       });
     } else {
       searchSummary.classList.add("hidden");
-    }
-  }
-
-  // Create the legend containing all file types
-  function updateColorLegend(fileTypes) {
-    const colorMode = colorBySelect.value;
-
-    // Hide all legends initially
-    typeLegendItems.classList.add("hidden");
-    dateLegendItems.classList.add("hidden");
-    depthLegendItems.classList.add("hidden");
-    fileSizeLegendItems.classList.add("hidden");
-
-    if (colorMode === "type") {
-      typeLegendItems.classList.remove("hidden");
-
-      // Add legend item for folders (default gray)
-      // const folderLegendItem = document.createElement("div");
-      // folderLegendItem.className = "legend-item";
-      // folderLegendItem.innerHTML = `
-      //                   <span class="w-4 h-4 rounded-full" style="background-color: var(--AshGrey);"></span>
-      //                   <span>Folder</span>
-      //               `;
-      //typeLegendItems.appendChild(folderLegendItem);
-
-      // Add legend items for file types
-      // fileTypes.forEach((type) => {
-      //   const legendItem = document.createElement("div");
-      //   legendItem.className = "legend-item";
-      //   legendItem.innerHTML = `
-      //                   <span class="w-4 h-4 rounded-full" style="background-color: ${categoricalColorScale(type)};"></span>
-      //                       <span>.${type}</span>
-      //                   `;
-      //   typeLegendItems.appendChild(legendItem);
-      // });
-    } else if (colorMode === "date") {
-      dateLegendItems.classList.remove("hidden");
-    } else if (colorMode === "depth") {
-      depthLegendItems.classList.remove("hidden");
-    } else if (colorMode === "fileSize") {
-      fileSizeLegendItems.classList.remove("hidden");
     }
   }
 
@@ -1868,7 +1959,7 @@ function exportCanvasAsPNG() {
       if (entry.target === visualizationColumn) {
         const newWidth = entry.contentRect.width;
         // Set new height relative to window height, capped by newWidth for square aspect
-        const newHeight =Math.min(newWidth, window.innerHeight * 0.8);
+        const newHeight =Math.min(newWidth, window.innerHeight * 0.9);
 
         if (canvas.width !== newWidth || canvas.height !== newHeight) {
           canvas.width = newWidth;

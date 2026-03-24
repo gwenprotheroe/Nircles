@@ -8,10 +8,15 @@ function InteractionGraphs(data) {
   buildSizeGraph(data);
   //buildDepthGraph(data);
 }
+function resetAllGraphs(){
+  d3.select("svg").remove(); 
+}
   function buildDepthHistogram(dataset) {
-    const margin = { top: 10, right: 25, bottom: 20, left: 25 },
+    const margin = { top: 10, right: 20, bottom: 20, left: 50 },
       width = 250 - margin.left - margin.right,
       height = 125 - margin.top - margin.bottom;
+
+    d3.select("#depth-histogram").html("");
 
     const svg = d3
       .select("#depth-histogram")
@@ -25,16 +30,14 @@ function InteractionGraphs(data) {
     const root = d3.hierarchy(dataset);
     const allFiles = root.leaves().map((d) => {
       const data = d.data;
-      // Convert Unix (seconds) to JS Date (milliseconds)
-      data.dateObject = new Date(data.last_modified_unix * 1000);
+      data.depthObject = d.depth;
       return data;
     });
 
     // --- SCALES ---
-    // Using scaleTime for human-readable axes
     const x = d3
-      .scaleTime()
-      .domain(d3.extent(allFiles, (d) => d.dateObject))
+      .scaleLinear()
+      .domain(d3.extent(allFiles, (d) => d.depthObject))
       .nice()
       .range([0, width]);
     const depthCounts = {};
@@ -54,98 +57,11 @@ function InteractionGraphs(data) {
     // --- BINNING ---
     const histogram = d3
       .bin()
-      .value((d) => d.depth)
+      .value((d) => d.depthObject)
       .domain(x.domain())
-      .thresholds(x.ticks(8));
+      .thresholds(root.height);
 
     const bins = histogram(allFiles);
-    y.domain([0, d3.max(bins, (d) => d.length)]).nice(); // Scale y based on max count, with some padding
-
-    // --- DRAW BARS ---
-    const bars = svg
-      .selectAll("rect")
-      .data(bins)
-      .join("rect")
-      .attr("x", (d) => x(d.x0))
-      .attr("width", (d) => Math.max(0, x(d.x1) - x(d.x0) - 1))
-      .attr("y", (d) => y(d.length))
-      .attr("height", (d) => height - y(d.length))
-      .attr("fill", "#4682b4");
-
-    // --- AXES ---
-    
-    svg.append("g").call(d3.axisLeft(y));
-
-    // --- ADD BRUSHING BACK ---
-    const brush = d3
-      .brushX()
-      .extent([
-        [0, 0],
-        [width, height],
-      ])
-      .on("brush end", brushed);
-
-    svg.append("g").attr("class", "brush").call(brush);
-
-    function brushed(event) {
-      const selection = event.selection;
-      if (!selection) {
-        window.processAndRenderVisualization(allFiles);
-        return;
-      }
-
-      // Convert pixel selection back to Dates
-      const [minDate, maxDate] = selection.map(x.invert);
-
-      const filteredData = allFiles.filter(
-        (d) => d.dateObject >= minDate && d.dateObject <= maxDate,
-      );
-
-      window.processAndRenderVisualization(filteredData);
-    }
-  }
-
-function _buildDepthHistogram(dataset) {
-    const margin = { top: 10, right: 25, bottom: 20, left: 25 },
-      width = 250 - margin.left - margin.right,
-      height = 125 - margin.top - margin.bottom;
-
-    const svg = d3
-      .select("#depth-histogram")
-      .append("svg")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
-      .append("g")
-      .attr("transform", `translate(${margin.left},${margin.top})`);
-
-    // --- DATA PROCESSING ---
-    const root = d3.hierarchy(dataset);
-    const allFiles = root.leaves().map((d) => {
-      const data = d.data;
-      // Convert Unix (seconds) to JS Date (milliseconds)
-      data.dateObject = new Date(data.last_modified_unix * 1000);
-      return data;
-    });
-
-    // --- SCALES ---
-    // Using scaleTime for human-readable axes
-    const x = d3
-      .scaleTime()
-      .domain(d3.extent(allFiles, (d) => d.dateObject))
-      .nice()
-      .range([0, width]);
-
-    const y = d3.scaleLinear().range([height, 0]);
-
-    // --- BINNING ---
-    const histogram = d3
-      .bin()
-      .value((d) => d.dateObject)
-      .domain(x.domain())
-      .thresholds(x.ticks(10));
-
-    const bins = histogram(allFiles);
-
     y.domain([0, d3.max(bins, (d) => d.length)]).nice(); // Scale y based on max count, with some padding
 
     // --- DRAW BARS ---
@@ -163,11 +79,9 @@ function _buildDepthHistogram(dataset) {
     svg
       .append("g")
       .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).ticks().tickSizeOuter(0));
+      .call(d3.axisBottom(x).tickValues(x.domain()));
 
-    //.call(d3.axisBottom(x)); // D3 automatically formats dates here
-
-    svg.append("g").call(d3.axisLeft(y));
+    svg.append("g").call(d3.axisLeft(y).tickValues(y.domain()));
 
     // --- ADD BRUSHING BACK ---
     const brush = d3
@@ -183,27 +97,30 @@ function _buildDepthHistogram(dataset) {
     function brushed(event) {
       const selection = event.selection;
       if (!selection) {
-        window.processAndRenderVisualization(allFiles);
+        window.currentFilterFunction = null;
+        if(window.drawVisualization) window.drawVisualization();
         return;
       }
 
       // Convert pixel selection back to Dates
       const [minDate, maxDate] = selection.map(x.invert);
-
-      const filteredData = allFiles.filter(
-        (d) => d.dateObject >= minDate && d.dateObject <= maxDate,
-      );
-
-      window.processAndRenderVisualization(filteredData);
+      
+      window.currentFilterFunction = (d) => {
+          return d.depthObject !== undefined && d.depthObject >= minDate && d.depthObject <= maxDate;
+      };
+      window.currentFilterDescription = `Depth between ${Math.round(minDate)} and ${Math.round(maxDate)}`;
+      if(window.drawVisualization) window.drawVisualization();
     }
   }
 
   function buildPieChart(dataset) {
-    const width = 200,
-      height = 200,
+    const width = 242,
+      height = 242,
       margin = 20;
 
     const radius = Math.min(width, height) / 2 - margin;
+
+    d3.select("#file-type-pie").html("");
 
     // 1. Data Aggregation
     const root = d3.hierarchy(dataset);
@@ -213,10 +130,8 @@ function _buildDepthHistogram(dataset) {
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
 
-    const color = d3
-      .scaleOrdinal()
-      .domain(Object.keys(typeCounts))
-      .range(d3.schemeCategory10);
+    const color = window.categoricalColorScale;
+    
     // 2. Generators
     const pie = d3
       .pie()
@@ -225,8 +140,8 @@ function _buildDepthHistogram(dataset) {
 
     const arc = d3
       .arc()
-      .innerRadius(10)
-      .outerRadius(Math.min(width, height) / 2.5 - 1);
+      .innerRadius(0)
+      .outerRadius(Math.min(width, height) / 2.05);
 
     // This specific arc is used just for positioning labels slightly outward
     const labelArc = d3
@@ -264,7 +179,14 @@ function _buildDepthHistogram(dataset) {
       .attr("height", 20)
       .attr("fill", (d) => color(d.data[0]))
       .attr("stroke", "white")
-      .style("stroke-width", "1px");
+      .style("stroke-width", "0px")
+      .attr("cursor", "pointer")
+      .on("click", (event, d) => {
+        const selectedType = d.data[0];
+        window.currentFilterFunction = (node) => node.type === selectedType;
+        window.currentFilterDescription = `Type is .${selectedType}`;
+        if(window.drawVisualization) window.drawVisualization();
+      });
 
     // 4. Add Centered Labels (Filtered by Angle)
     svg
@@ -274,7 +196,7 @@ function _buildDepthHistogram(dataset) {
       .text((d) => d.data[0]) // The file type
       .attr("transform", (d) => `translate(${labelArc.centroid(d)})`)
       .style("text-anchor", "middle")
-      .style("font-size", "12px")
+      .style("font-size", "16px")
       // FILTER: Only show if angle > 20 degrees (0.35 radians)
       .style("display", (d) =>
         d.endAngle - d.startAngle > 0.35 ? "block" : "none",
@@ -283,9 +205,11 @@ function _buildDepthHistogram(dataset) {
   }
 
   function buildAgeGraph(dataset) {
-    const margin = { top: 10, right: 25, bottom: 20, left: 25 },
+    const margin = { top: 10, right: 40, bottom: 20, left: 50 },
       width = 220 - margin.left - margin.right,
       height = 125 - margin.top - margin.bottom;
+
+    d3.select("#date-graph").html("");
 
     const svg = d3
       .select("#date-graph")
@@ -300,7 +224,7 @@ function _buildDepthHistogram(dataset) {
       const allFiles = root.leaves().map((d) => {
       const data = d.data;
       // Convert Unix (seconds) to JS Date (milliseconds)
-      data.dateObject = new Date(data.last_modified_unix * 1000);
+      data.dateObject = new Date(Math.floor(data.last_modified_unix) * 1000);
       return data;
     }); 
     const dateCounts = {};
@@ -326,23 +250,16 @@ function _buildDepthHistogram(dataset) {
       .nice()
       .range([height, 0]);
 
-    // 3. Line Generator
-    const line = d3
-      .line()
-      .x((d) => x(d.date))
-      .y((d) => y(d.count))
-      .curve(d3.curveMonotoneX); // Makes the line smooth
-
-    // 4. Draw Path
     svg
-      .append("path")
-      .datum(plotData)
-      .attr("fill", "none")
-      .attr("stroke", "#ff6347")
-      .attr("stroke-width", 3)
-      .attr("d", line);
+      .append("g")
+      .attr("transform", `translate(0,${height})`)
+      .call(d3.axisBottom(x).tickValues(x.domain()).tickFormat(d3.timeFormat("%d.%m.%Y")))
+      .exit().remove(); 
 
-    // 5. Add Dots (to make data points clickable/visible)
+    svg.append("g").call(d3.axisLeft(y).tickValues(y.domain()))
+    .exit().remove(); 
+
+    //  Add Dots (to make data points clickable/visible)
     svg
       .selectAll(".dot")
       .data(plotData)
@@ -351,17 +268,43 @@ function _buildDepthHistogram(dataset) {
       .attr("cx", (d) => x(d.date))
       .attr("cy", (d) => y(d.count))
       .attr("r", 5)
-      .attr("fill", "#ff6347");
+      .attr("fill", (d) => window.linearBWColorScale1(d.date.getTime() / 1000))
+      .exit().remove(); 
 
-    // 6. Axes
-    svg
-      .append("g")
-      .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).ticks(2).tickFormat(d3.timeFormat("%d %m/%y")));
+    
+    // --- ADD BRUSHING BACK ---
+    const brush = d3
+      .brushX()
+      .extent([
+        [0, 0],
+        [width, height],
+      ])
+      .on("brush end", brushed);
 
-    svg.append("g").call(d3.axisLeft(y).ticks(4));
+    svg.append("g").attr("class", "brush").call(brush)
+    .exit().remove(); 
+
+
+    function brushed(event) {
+      const selection = event.selection;
+      if (!selection) {
+        window.currentFilterFunction = null;
+        window.currentFilterDescription = null;
+        if(window.drawVisualization) window.drawVisualization();
+        return;
+      }
+      // Convert pixel selection back to Dates
+      const [minDate, maxDate] = selection.map(x.invert);
+      
+      window.currentFilterFunction = (d) => {
+          return d.dateObject !== undefined && d.dateObject >= minDate && d.dateObject <= maxDate;
+      };
+      window.currentFilterDescription = `Date between ${minDate.toLocaleDateString()} and ${maxDate.toLocaleDateString()}`;
+      if(window.drawVisualization) window.drawVisualization();
+    }
+
   }
-  function buildDepthGraph(dataset) {
+  function buildRatioDepthGraph(dataset) {
     const margin = { top: 10, right: 25, bottom: 20, left: 25 },
       width = 220 - margin.left - margin.right,
       height = 125 - margin.top - margin.bottom;
@@ -379,7 +322,7 @@ function _buildDepthHistogram(dataset) {
     const allFiles = root.leaves().map((d) => {
       const data = d.data;
       // Convert Unix (seconds) to JS Date (milliseconds)
-      data.dateObject = new Date(data.last_modified_unix * 1000);
+      data.depthObject = new Date(data.last_modified_unix * 1000);
       return data;
     });
 
@@ -438,14 +381,16 @@ function _buildDepthHistogram(dataset) {
     svg
       .append("g")
       .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).ticks(plotData.length));
+      .call(d3.axisBottom(x).tickValues(x.domain()));
 
-    svg.append("g").call(d3.axisLeft(y).ticks(5));
+    svg.append("g").call(d3.axisLeft(y).tickValues(y.domain()));
   }
   function buildSizeGraph(dataset) {
-    const margin = { top: 10, right: 25, bottom: 20, left: 25 },
+    const margin = { top: 10, right: 25, bottom: 20, left: 50 },
       width = 220 - margin.left - margin.right,
       height = 125 - margin.top - margin.bottom;
+
+    d3.select("#size-graph").html("");
 
     const svg = d3
       .select("#size-graph")
@@ -457,72 +402,76 @@ function _buildDepthHistogram(dataset) {
 
     // --- DATA PROCESSING ---
     const root = d3.hierarchy(dataset);
-    const allFiles = root.leaves().map((d) => {
-      const data = d.data;
-      return data;
-    });
+    const allFiles = root.leaves().filter(d => d.data.value > 0).map(d => d.data);
 
     // --- SCALES ---
     // Use scaleLinear for file sizes (numeric)
     const x = d3
-      .scaleLinear()
-      .domain(d3.extent(allFiles, (d) => d.size))
+      .scaleLog()
+      .domain(d3.extent(allFiles, (d) => d.value))
       .nice()
       .range([0, width]);
 
     // --- BINNING ---
     const histogram = d3
       .bin()
-      .value((d) => d.size)
+      .value((d) => d.value)
       .domain(x.domain())
-      .thresholds(x.ticks(10));
+      .thresholds(x.ticks(9));
 
     const bins = histogram(allFiles);
 
-    // Prepare plotData: each bin as {size: bin center, count: bin length}
-    // Prepare plotData: each bin as {size: bin lower bound (x0), count: bin length}
-    const plotData = bins.map(bin => ({
-      size: bin.x0,
-      count: bin.length
-    }));
     const y = d3
       .scaleLinear()
-      .domain([0, d3.max(plotData, (d) => d.count)])
+      .domain([0, d3.max(bins, (d) => d.length)])
       .nice()
       .range([height, 0]);
 
-    // 3. Line Generator
-    const line = d3
-      .line()
-      .x((d) => x(d.size))
-      .y((d) => y(d.count))
-      .curve(d3.curveMonotoneX); // Makes the line smooth
-
-    // 4. Draw Path
     svg
-      .append("path")
-      .datum(plotData)
-      .attr("fill", "none")
-      .attr("stroke", "#ff6347")
-      .attr("stroke-width", 3)
-      .attr("d", line);
+      .selectAll("rect")
+      .data(bins)
+      .join("rect")
+      .attr("x", (d) => x(d.x0))
+      .attr("width", (d) => Math.max(0, x(d.x1) - x(d.x0) - 1))
+      .attr("y", (d) => y(d.length))
+      .attr("height", (d) => height - y(d.length))
+      .attr("fill", (d) => window.exponentialColorScale(d.x0));
 
-    // 5. Add Dots (to make data points clickable/visible)
-    svg
-      .selectAll(".dot")
-      .data(plotData)
-      .enter()
-      .append("circle")
-      .attr("cx", (d) => x(d.size))
-      .attr("cy", (d) => y(d.count))
-      .attr("r", 5)
-      .attr("fill", "#ff6347");
-
-    // 6. Axes
+    // --- AXES ---
     svg
       .append("g")
       .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).ticks(6));
+      .call(d3.axisBottom(x).ticks(5).tickFormat(window.formatBytes));
 
-  svg.append("g").call(d3.axisLeft(y).ticks(5));
+  svg.append("g").call(d3.axisLeft(y).tickValues(y.domain()));
+
+    // --- ADD BRUSHING ---
+    const brush = d3
+      .brushX()
+      .extent([
+        [0, 0],
+        [width, height],
+      ])
+      .on("brush end", brushed);
+
+    svg.append("g").attr("class", "brush").call(brush);
+
+    function brushed(event) {
+      const selection = event.selection;
+      if (!selection) {
+        window.currentFilterFunction = null;
+        window.currentFilterDescription = null;
+        if(window.drawVisualization) window.drawVisualization();
+        return;
+      }
+
+      // Convert pixel selection back to size values
+      const [minSize, maxSize] = selection.map(x.invert);
+      
+      window.currentFilterFunction = (d) => {
+          return d.value !== undefined && d.value >= minSize && d.value <= maxSize;
+      };
+      window.currentFilterDescription = `Size between ${window.formatBytes(minSize)} and ${window.formatBytes(maxSize)}`;
+      if(window.drawVisualization) window.drawVisualization();
+    }
   }

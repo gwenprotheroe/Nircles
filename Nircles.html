@@ -70,12 +70,6 @@
         <input type="text" id="searchInput" onchange="dropdown('searchDropdown')" placeholder="Search...">
         <!-- <div class="searchBarbtn"> -->
         <div id="searchDropdown" class="dropdown-content">  
-                    <a id="filterButton" class="hidden">
-                        Filter
-                    </a>
-                    <a id="filterOutButton" class="hidden">
-                        Filter Out
-                    </a>
             <!-- </div> -->
         </div>
         </div>
@@ -150,7 +144,6 @@
                     <label for="colorBy" class="form-label">
                         Colour By:
                     </label>
-
                     <select id="colorBy">
                         <option value="depth">Depth</option>
                         <option value="type">File Type</option>
@@ -159,13 +152,13 @@
                     </select>
                 </div>  <!-- Colour By Selection -->
                 <div id="analysisBreakdown">    
-                <div id="typeLegendItems" class="hidden">
+                <div id="typeLegendItems">
                     <h4>File Type</h4>
                     <div id="file-type-pie">
                     </div>
-                    <svg id="pie"></svg>
+                    <!-- <svg id="pie"></svg> -->
                 </div>
-            <div id="dateLegendItems" class="hidden">
+            <div id="dateLegendItems">
                 <h4>Last Modified Date</h4>
                 <svg id="date-graph"></svg>
                 <div id="dateLegendBar" class="legend-bar">
@@ -181,25 +174,17 @@
                         <span id="maxDateLabel"></span>
                     </div>
                 </div>
-                <div id="depthLegendItems" class="hidden">
+                <div id="depthLegendItems">
                     <h4>Depth</h4>
+                    <div id="depth-graph">
+                        <svg id="depth-histogram"></svg>
+                    </div>
                     <div id="depthLegendBar" class="legend-bar">
                     </div>
-                    <svg id="depth-histogram"></svg>
-                    <div class="legend-labels">
-                        <span id="minDepthLabel"></span>
-                        <span id="maxDepthLabel"></span>
-                    </div>
                 </div>
-                <div id="fileSizeLegendItems" class="hidden">
-                    <h4>Folder Size</h4>
+                <div id="fileSizeLegendItems">
+                    <h4>File Size</h4>
                     <svg id="size-graph"></svg>
-                    <div id="fileSizeLegendBar" class="legend-bar"></div>
-                    <div class="legend-labels">                    
-                        
-                        <span id="minFileSizeLabel">Smallest</span>
-                        <span id="maxFileSizeLabel">Largest</span>
-                    </div>
                 </div>
             </div>   <!-- Analysis Breakdown Section -->
             
@@ -213,6 +198,14 @@
                 <button id="seeResultsButton">
                     List Search Results
                 </button>
+                <div>
+                    <button id="filterButton" class="hidden">
+                        Filter
+                    </button>
+                    <button id="filterOutButton" class="hidden">
+                        Filter Out
+                    </button>
+                </div>
             </div>
         </div>
     </div>
