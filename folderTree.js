@@ -223,20 +223,20 @@ function createFolderTree(data, containerSelector) {
     if (!node) return;
 
     // Recursive search to find node even if hidden in _children
-    function findNodeRecursive(d, path) {
-        if (d.data.path === path) return d;
+    function findNodeRecursive(d,name, path) {
+        if (d.data.path === path && d.data.name === name) return d;
         // Check both visible and hidden children
         const kids = d.children || d._children;
         if (kids) {
             for (const child of kids) {
-                const found = findNodeRecursive(child, path);
+                const found = findNodeRecursive(child, name, path);
                 if (found) return found;
             }
         }
         return null;
     }
 
-    const targetInTree = findNodeRecursive(root, node.data.path);
+    const targetInTree = findNodeRecursive(root,node.data.name, node.data.path);
 
     // 2. Update tree state: Expand path to target, collapse others
     if (targetInTree) {

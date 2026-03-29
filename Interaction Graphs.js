@@ -6,6 +6,7 @@ function InteractionGraphs(data) {
   buildAgeGraph(data);
   buildPieChart(data);
   buildSizeGraph(data);
+  buildRatioHistogram(data);
   //buildDepthGraph(data);
 }
 function resetAllGraphs(){
@@ -21,8 +22,7 @@ function resetAllGraphs(){
     const svg = d3
       .select("#depth-histogram")
       .append("svg")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
+      .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -73,7 +73,7 @@ function resetAllGraphs(){
       .attr("width", (d) => Math.max(0, x(d.x1) - x(d.x0) - 1))
       .attr("y", (d) => y(d.length))
       .attr("height", (d) => height - y(d.length))
-      .attr("fill", "#4682b4");
+      .attr("fill", d => window.linearRainbowColorScale(d.x0));
 
     // --- AXES ---
     svg
@@ -111,6 +111,86 @@ function resetAllGraphs(){
       window.currentFilterDescription = `Depth between ${Math.round(minDate)} and ${Math.round(maxDate)}`;
       if(window.drawVisualization) window.drawVisualization();
     }
+  }
+
+  function buildRatioHistogram(dataset) {
+    const margin = { top: 10, right: 20, bottom: 20, left: 50 },
+      width = 250 - margin.left - margin.right,
+      height = 125 - margin.top - margin.bottom;
+
+    d3.select("#ratio-histogram").html("");
+
+    const svg = d3
+      .select("#ratio-histogram")
+      .append("svg")
+      .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const root = d3.hierarchy(dataset);
+    // Get ratio from folders only
+    const folderData = root.descendants()
+        .filter(d => d.children && d.data.folderFileRatio !== undefined)
+        .map(d => d.data);
+
+    if (folderData.length === 0) return;
+
+    const x = d3.scaleLinear()
+      //.domain([0, 20]) // Focus on the 0-20 range as requested
+      .domain(d3.extent(folderData, d => d.folderFileRatio))
+      .nice()
+      .range([0, width]);
+
+    const histogram = d3.bin()
+      .value(d => d.folderFileRatio)
+      .domain(x.domain())
+      .thresholds(x.ticks(12));
+
+    const bins = histogram(folderData);
+
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(bins, d => d.length)])
+      .nice()
+      .range([height, 0]);
+
+    svg.selectAll("rect")
+      .data(bins)
+      .join("rect")
+      .attr("x", d => x(d.x0))
+      .attr("width", d => Math.max(0, x(d.x1) - x(d.x0) - 1))
+      .attr("y", d => y(d.length))
+      .attr("height", d => height - y(d.length))
+      .attr("fill", d => window.folderRatioColorScale(d.x0));
+
+    svg.append("g")
+      .attr("transform", `translate(0,${height})`)
+      .call(d3.axisBottom(x).ticks(5));
+
+    svg.append("g").call(d3.axisLeft(y).ticks(5));
+
+    const brush = d3.brushX()
+      .extent([[0, 0], [width, height]])
+      .on("brush end", (event) => {
+        const selection = event.selection;
+        if (!selection) {
+          window.currentFilterFunction = null;
+          window.currentFilterDescription = null;
+          if(window.drawVisualization) window.drawVisualization();
+          return;
+        }
+
+        const [minR, maxR] = selection.map(x.invert);
+        window.currentFilterFunction = (d) => {
+            // Allow files to be visible if their parent is a folder within the ratio range
+            // or if we are filtering the folders themselves.
+            const ratio = d.folderFileRatio;
+            return ratio !== undefined && ratio >= minR && ratio <= maxR;
+        };
+        window.currentFilterDescription = `Ratio between ${minR.toFixed(1)} and ${maxR.toFixed(1)}`;
+        if(window.drawVisualization) window.drawVisualization();
+      });
+
+    svg.append("g").attr("class", "brush").call(brush);
   }
 
   function buildPieChart(dataset) {
@@ -155,9 +235,7 @@ function resetAllGraphs(){
     const svg = d3
       .select("#file-type-pie")
       .append("svg")
-      .attr("width", width)
-      .attr("height", height)
-      .attr("viewBox", [-width / 2, -height / 2, width, height*1.2]);
+      .attr("viewBox", [-width / 2, -height / 2, width, height * 1.2]);
     svg
       .append("g")
       .attr("stroke", "white")
@@ -179,12 +257,16 @@ function resetAllGraphs(){
       .attr("height", 20)
       .attr("fill", (d) => color(d.data[0]))
       .attr("stroke", "white")
-      .style("stroke-width", "0px")
       .attr("cursor", "pointer")
       .on("click", (event, d) => {
         const selectedType = d.data[0];
-        window.currentFilterFunction = (node) => node.type === selectedType;
-        window.currentFilterDescription = `Type is .${selectedType}`;
+        if (window.currentFilterDescription === `Type is .${selectedType}`) {
+          window.currentFilterFunction = null;
+          window.currentFilterDescription = null;
+        } else {
+          window.currentFilterFunction = (node) => node.type === selectedType;
+          window.currentFilterDescription = `Type is .${selectedType}`;
+        }
         if(window.drawVisualization) window.drawVisualization();
       });
 
@@ -195,13 +277,10 @@ function resetAllGraphs(){
       .join("text")
       .text((d) => d.data[0]) // The file type
       .attr("transform", (d) => `translate(${labelArc.centroid(d)})`)
-      .style("text-anchor", "middle")
-      .style("font-size", "16px")
       // FILTER: Only show if angle > 20 degrees (0.35 radians)
       .style("display", (d) =>
         d.endAngle - d.startAngle > 0.35 ? "block" : "none",
-      )
-      .style("pointer-events", "none"); // Ensure text doesn't block mouse interactions
+      );
   }
 
   function buildAgeGraph(dataset) {
@@ -214,8 +293,7 @@ function resetAllGraphs(){
     const svg = d3
       .select("#date-graph")
       .append("svg")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
+      .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -395,8 +473,7 @@ function resetAllGraphs(){
     const svg = d3
       .select("#size-graph")
       .append("svg")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
+      .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -441,7 +518,7 @@ function resetAllGraphs(){
     svg
       .append("g")
       .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).ticks(5).tickFormat(window.formatBytes));
+      .call(d3.axisBottom(x).ticks(4).tickValues(x.domain()).tickFormat(window.formatBytes));
 
   svg.append("g").call(d3.axisLeft(y).tickValues(y.domain()));
 

@@ -217,6 +217,26 @@ input[type="range"] {
 /* Visualization Area */
 #visualizationColumn {
   grid-column: span 1 / span 1;
+  position: relative; /* For positioning toggle buttons */
+}
+
+.toggle-side-panel-btn {
+  position: absolute;
+  top: 10px;
+  z-index: 20;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#toggleTreeBtn {
+  left: 10px;
+}
+
+#toggleGraphBtn {
+  right: 10px;
 }
 @media (min-width: 768px) {
   #visualizationColumn {
@@ -231,6 +251,13 @@ input[type="range"] {
   display: block;
   width: 100%;
 }
+#overlayCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none; /* Let clicks pass through to main canvas */
+}
+
 #folderViz.grabbing {
   cursor: grab;
 }
@@ -373,21 +400,25 @@ text {
 /* Tooltip */
 .tooltip {
   position: absolute;
+  top: 0;
+  left: 0;
   text-align: left;
-  padding: 8px;
-  background: var(--Silver, #a9aca9);
-  color: black;
-  border: black;
-  border-style: solid;
-  border-width: 1px;
-  border-radius: 6px;
+  padding: 10px 15px;
+  background: rgba(40, 40, 40, 0.85);
+  color: #f0f0f0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.2s ease;
-  font-size: 15px;
-  box-shadow: 0 4px 6px #000000;
-  max-width: 250px;
+  /* Use transform for smooth movement and opacity for fade */
+  transition: opacity 0.3s ease, transform 0.1s ease-out;
+  font-size: 14px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  max-width: 300px;
   word-wrap: break-word;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px); /* For Safari */
+  z-index: 100; /* Ensure it's on top */
 }
 
 /* Message Box */
@@ -432,7 +463,34 @@ text {
   text-align: left;
 }
 
+.popup-footer {
+  text-align: right;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+}
 
+/* Search Popup Specifics */
+#searchPopup .settings-box-content {
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  width: 600px;
+  max-width: 90vw;
+}
+
+#searchPopup h2 {
+  margin-top: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+#searchPopup #searchItems {
+  flex: 1;
+  overflow-y: auto;
+  margin: 10px 0;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
 
 .text-error {
   color: var(--error);
@@ -443,14 +501,24 @@ text {
 
 .search-result-item {
   cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 0.25rem;
-  margin-bottom: 0.25rem;
+  padding: 8px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
   color: var(--text-muted);
 }
 .search-result-item:hover {
   background-color: rgba(0, 0, 0, 0.05);
   text-decoration: underline;
+}
+
+.search-result-item > div:first-child {
+  font-weight: bold;
+  font-size: 14px;
+}
+.search-result-item > div:last-child {
+  font-size: 11px;
+  color: #666;
+  word-break: break-all;
 }
 
 .hidden {
@@ -470,4 +538,173 @@ text {
 }
 .h-4 {
   height: 1rem;
+}
+
+/* Interaction Graph SVGs */
+.interaction-graph-column svg {
+  width: 100%;
+  height: auto;
+}
+
+#file-type-pie text {
+  text-anchor: middle;
+  font-size: 16px;
+  pointer-events: none; /* Ensure text doesn't block mouse interactions */
+}
+
+/* Merged from topnav.css */
+.navbar {
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 250px 1fr 200px auto;
+  width: 100%;
+  /* position: sticky; */
+  background-color: #888;
+}
+.menu-container {
+  display: inline-flex;
+  justify-content: space-between;
+  align-items: top;
+}
+
+.navbar a {
+  float: left;
+  text-align: left;
+  padding: 0px 20px;
+  text-decoration: none;
+  font-size: 17px;
+}
+
+.navbar a:hover {
+  color: #3a3835;
+  border-radius: 0.5rem;
+}
+
+.navbar a.active {
+  background-color: #04aa6d;
+  color: white;
+  border-radius: 0.5rem;
+}
+
+.navbar .icon {
+  display: none;
+  color: white;
+  padding: 0px 20px;
+}
+.addressbar {
+  display: grid;
+  align-items: top;
+  height: 26px;
+  grid-template-columns: 1fr 100px; /*100px 200px; */
+  grid-gap: auto;
+  overflow-wrap: break-word;
+  align-items: top;
+  padding: 4px;
+  background-color: #fff;
+}
+
+@media screen and (max-width: 600px) {
+  .navbar a:not(:first-child) {
+    display: none;
+  }
+  .navbar a.icon {
+    float: right;
+    display: block;
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .navbar.responsive {
+    position: relative;
+  }
+  .navbar.responsive .icon {
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+  .navbar.responsive a {
+    float: none;
+    display: block;
+    text-align: left;
+  }
+}
+
+.dropdown {
+  float: left;
+  overflow: hidden;
+}
+.searchBar {
+  padding: 4px;
+  align-items: right;
+  text-align: right;
+  float: right;
+  display: block;
+}
+.searchBarbtn {
+  display: inline-flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dropdown .dropbtn {
+  cursor: pointer;
+  font-size: 16px;
+  border: none;
+  outline: none;
+  color: white;
+  padding: 2px 16px;
+  background-color: inherit;
+  font-family: inherit;
+  margin: 0;
+}
+
+.dropdown-content {
+  cursor: pointer;
+  display: none;
+  position: absolute;
+  background-color: #f9f9f9;
+  /* min-width: 160px; */
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+.dropdown-content a {
+  float: none;
+  color: black;
+  padding: 2px 16px;
+  text-decoration: none;
+  display: block;
+  text-align: left;
+}
+
+.show {
+  display: block;
+}
+.dropdown-content a:hover {
+  background-color: #ddd;
+}
+
+/* Merged from folderTree.css */
+#folder-tree-container {
+    overflow: auto;
+    height: 30vh;
+    /* border: 1px solid #000; */
+    margin: 6px;
+    text-align: left;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Style for the tree text */
+.node text {
+    font: 12px sans-serif;
+    align-items:normal;
+    text-align: right;
+}
+
+/* Style for the links between nodes */
+.link {
+    fill: none;
+    stroke: #000;
+    stroke-opacity: 0.4;
+    stroke-width: 5px;
 }

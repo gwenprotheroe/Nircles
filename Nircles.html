@@ -9,10 +9,7 @@
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Roboto" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-    <!-- <link rel="stylesheet" href="stylesheet.css"> -->
-    <link rel="stylesheet" href="topnav.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <link rel="stylesheet" href="folderTree.css">
 </head>
 
 <body>
@@ -128,6 +125,10 @@
                     <strong>Last Modified:</strong>
                     <span id="detailLastModified"></span>
                 </p>
+                <div id="folderSpecificActions" class="hidden">
+                    <button id="folderFilterButton" class="small-btn">Filter to this</button>
+                    <button id="folderFilterOutButton" class="small-btn">Filter out this</button>
+                </div>
         </div>
             <div id="initialDetailsPrompt">
                 <p>
@@ -136,6 +137,8 @@
         </div>
             </div>
             <div id="visualizationColumn" class="visualization-column">
+                <button id="toggleTreeBtn" title="Toggle Folder Tree" class="toggle-side-panel-btn">&#9664;</button>
+                <button id="toggleGraphBtn" title="Toggle Graphs" class="toggle-side-panel-btn">&#9654;</button>
                 <canvas id="folderViz"></canvas>
             </div>
             <div id="interaction-graph-container" class="interaction-graph-column">
@@ -146,17 +149,34 @@
                     </label>
                     <select id="colorBy">
                         <option value="depth">Depth</option>
-                        <option value="type">File Type</option>
+                        <option value="ratio">Ratio (Folders)</option>
+                        <option value="type">Type</option>
                         <option value="fileSize">Size</option>
-                        <option value="date">Last Modified Date</option>
+                        <option value="date">Age</option>
                     </select>
-                </div>  <!-- Colour By Selection -->
+                </div> <!-- Colour By Selection -->
                 <div id="analysisBreakdown">    
                 <div id="typeLegendItems">
                     <h4>File Type</h4>
                     <div id="file-type-pie">
                     </div>
                     <!-- <svg id="pie"></svg> -->
+                </div>
+                <div id="ratioLegendItems" class="legend-container hidden">
+                    <h4>Folder Ratio Legend</h4>
+                    <div class="legend-bar" style="background: linear-gradient(to right, black, green, yellow, red);"></div>
+                    <div class="legend-labels">
+                        <span>Empty</span>
+                        <span>7</span>
+                        <span>20</span>
+                        <span>100+</span>
+                    </div>
+                </div>
+                <div id="ratioGraphItems" class="legend-container hidden">
+                    <h4>Ratio Distribution</h4>
+                    <div id="ratio-graph">
+                        <svg id="ratio-histogram"></svg>
+                    </div>
                 </div>
             <div id="dateLegendItems">
                 <h4>Last Modified Date</h4>
@@ -167,8 +187,8 @@
                     <label for="dateCutoff" class="form-label">
                         Date:
                         <input type="range" min="0" max="100" class="slider" id="dateCutoff">
-                    </label>
-                    </div>
+                </label>
+                </div>
                     <div class="legend-labels">
                         <span id="minDateLabel"></span>
                         <span id="maxDateLabel"></span>
@@ -204,6 +224,9 @@
                     </button>
                     <button id="filterOutButton" class="hidden">
                         Filter Out
+                    </button>
+                    <button id="resetButton" class="hidden">
+                        Remove Filter
                     </button>
                 </div>
             </div>
@@ -262,7 +285,7 @@
         <div class="settings-box-content">
             <h2>Search Results</h2>
             <div id="searchItems"></div>
-            <div>
+            <div class="popup-footer">
                 <button id="closeSearchResultsBox">OK</button>
             </div>
         </div>
