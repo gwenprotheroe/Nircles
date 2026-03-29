@@ -15,60 +15,57 @@
 <body>
 
     <div class="navbar" id="navbar">
-        <div class="menu-container">   
-        <div class="fileMenu">
-            <button class="dropbtn" onclick="dropdown('fileDropdown')">File</button>
-            <div id="fileDropdown" class="dropdown-content">
-                <a id="newScanButton">New Scan</a>
-                <a id="saveScanButton">Save Scan</a>
-                <a id="loadJsonFileButton" href="#">Load Scan</a>
-                <input type="file" id="jsonFileLoad" accept=".json">
-                <a id="exportPngButton">Export Image</a>
-                <a id="exportSvgButton" href="#">Export SVG</a>
-                <a id="closeApp" href="#">Close</a>
+        <div class="menu-container">
+            <div class="fileMenu">
+                <button class="dropbtn" onclick="dropdown('fileDropdown')">File</button>
+                <div id="fileDropdown" class="dropdown-content">
+                    <a id="newScanButton">New Scan</a>
+                    <a id="saveScanButton">Save Scan</a>
+                    <a id="loadJsonFileButton" href="#">Load Scan</a>
+                    <input type="file" id="jsonFileLoad" accept=".json">
+                    <a id="exportPngButton">Export Image</a>
+                    <a id="exportSvgButton" href="#">Export SVG</a>
+                    <a id="closeApp" href="#">Close</a>
+                </div>
+            </div>
+            <div class="editMenu">
+                <button class="dropbtn" onclick="dropdown('editDropdown')">Edit</button>
+                <div id="editDropdown" class="dropdown-content">
+                    <a href="#">Undo</a>
+                    <a href="#">Redo</a>
+                    <a href="#">Move</a>
+                    <a href="#">Copy</a>
+                    <a href="#">Delete</a>
+                    <a id="ScanSettings" href="#">Scan Settings</a>
+                </div>
+            </div>
+            <div class="viewMenu">
+                <button class="dropbtn" onclick="dropdown('viewDropdown')">View</button>
+                <div id="viewDropdown" class="dropdown-content">
+                    <a id="viewSettings" href="#">View Settings</a>
+                    <a id="NavMode" href="#">Navigation Mode</a>
+                    <a id="AnalysisMode" href="#">Analysis Mode</a>
+                    <a id="EditingMode" href="#">Editing Mode</a>
+                    <a id="zoomOutButton" href="#">Reset Zoom</a>
+                </div>
+            </div>
+            <div class="helpMenu">
+                <button class="dropbtn" onclick="dropdown('helpDropdown')">Help</button>
+                <div id="helpDropdown" class="dropdown-content">
+                    <a href="#">Documentation</a>
+                    <a href="#">Feedback</a>
+                    <a id="showAboutPageButton" href="#">About</a>
+                </div>
             </div>
         </div>
-        <div class="editMenu">
-            <button class="dropbtn" onclick="dropdown('editDropdown')">Edit</button>
-            <div id="editDropdown" class="dropdown-content">
-                <a href="#">Undo</a>
-                <a href="#">Redo</a>
-                <a href="#">Move</a>
-                <a href="#">Copy</a>
-                <a href="#">Delete</a>
-                <a id="ScanSettings" href="#">Scan Settings</a>
-            </div>
-        </div>
-        <div class="viewMenu">
-            <button class="dropbtn" onclick="dropdown('viewDropdown')">View</button>
-            <div id="viewDropdown" class="dropdown-content">
-                <a id="viewSettings" href="#">View Settings</a>
-                <a id="NavMode" href="#">Navigation Mode</a>
-                <a id="AnalysisMode" href="#">Analysis Mode</a>
-                <a id="EditingMode" href="#">Editing Mode</a>
-                <a id="zoomOutButton" href="#">Reset Zoom</a>
-            </div>
-        </div>
-        <div class="helpMenu">
-            <button class="dropbtn" onclick="dropdown('helpDropdown')">Help</button>
-            <div id="helpDropdown" class="dropdown-content">
-                <a href="#">Documentation</a>
-                <a href="#">Feedback</a>
-                <a id="showAboutPageButton" href="#">About</a>
-            </div>
-        </div>
-        </div> 
         <div class="logo">
             <h3>Nircles</h3>
         </div>
         <div class="searchBar">
-        <!-- <h2> Search: </h2> -->
-        <!-- </label> -->
-        <input type="text" id="searchInput" onchange="dropdown('searchDropdown')" placeholder="Search...">
-        <!-- <div class="searchBarbtn"> -->
-        <div id="searchDropdown" class="dropdown-content">  
-            <!-- </div> -->
-        </div>
+            <!-- <label for="searchInput"> -->
+            <!-- Search: -->
+            <input type="text" id="searchInput" onchange="dropdown('searchDropdown')" placeholder="Search...">
+            <!-- </label> -->
         </div>
 
         <a href="javascript:void(0);" class="icon" onclick="navbarResponse()">
@@ -79,9 +76,9 @@
         <div class="detail-item hidden">
             <strong>Breadcrumbs:</strong> <span id="breadcrumbs"></span>
         </div>
-            <p class="detail-item">
-                <strong>Full Path:</strong> <span id="detailPath"></span>
-            </p>
+        <p class="detail-item">
+            <strong>Full Path:</strong> <span id="detailPath"></span>
+        </p>
         <div class="output-group">
             <button id="copyPathButton">
                 Copy Path
@@ -91,50 +88,41 @@
     <div class="container-wrapper">
         <div class="main-grid">
             <div id="folder-tree-column" class="details-column">
-                <div class="detail-item">
-                    <h2>Details</h2>
-                <h3>
-                    Main Summary:
-                </h3>
-                </div>
                 <div id="folderSummary"></div>
-                
                 <button id="resetButton" class="hidden">
-                    Remove Filter
+                    Remove Filter ℙ
                 </button>
-                <!-- <h2>Folder Tree</h2> -->
                 <div id="folder-tree-container"></div>
-                
                 <h3>
                     Selected Item:
                 </h3>
-            <div id="selectedItemDetails" class="hidden">
-                <p class="detail-item">
-                    <strong>Name:</strong> <span id="detailName"></span>
-                </p>
-                <p class="detail-item">
-                    <strong>Type:</strong> <span id="detailType"></span>
-                </p>
-                <p class="detail-item">
-                    <strong>Sub-items:</strong> <span id="detailChildren"></span>
-                </p>
-                <p class="detail-item">
-                    <strong>Size:</strong> <span id="detailSize"></span>
-                </p>
-                <p class="detail-item">
-                    <strong>Last Modified:</strong>
-                    <span id="detailLastModified"></span>
-                </p>
-                <div id="folderSpecificActions" class="hidden">
-                    <button id="folderFilterButton" class="small-btn">Filter to this</button>
-                    <button id="folderFilterOutButton" class="small-btn">Filter out this</button>
+                <div id="selectedItemDetails" class="hidden">
+                    <p class="detail-item">
+                        <strong>Name:</strong> <span id="detailName"></span>
+                    </p>
+                    <p class="detail-item">
+                        <strong>Type:</strong> <span id="detailType"></span>
+                    </p>
+                    <p class="detail-item">
+                        <strong>Sub-items:</strong> <span id="detailChildren"></span>
+                    </p>
+                    <p class="detail-item">
+                        <strong>Size:</strong> <span id="detailSize"></span>
+                    </p>
+                    <p class="detail-item">
+                        <strong>Last Modified:</strong>
+                        <span id="detailLastModified"></span>
+                    </p>
+                    <div id="folderSpecificActions" class="hidden">
+                        <button id="folderFilterButton" class="small-btn">Filter ⊂</button>
+                        <button id="folderFilterOutButton" class="small-btn">Filter out ⊄</button>
+                    </div>
                 </div>
-        </div>
-            <div id="initialDetailsPrompt">
-                <p>
-                    Click on any item to see its details here.
-                </p>
-        </div>
+                <div id="initialDetailsPrompt">
+                    <p>
+                        Click on any item to see its details here.
+                    </p>
+                </div>
             </div>
             <div id="visualizationColumn" class="visualization-column">
                 <button id="toggleTreeBtn" title="Toggle Folder Tree" class="toggle-side-panel-btn">&#9664;</button>
@@ -143,97 +131,94 @@
             </div>
             <div id="interaction-graph-container" class="interaction-graph-column">
                 <div class="input-group">
-                    <h2>Colour Legend</h2>
+                    <h2>Controls</h2>
                     <label for="colorBy" class="form-label">
-                        Colour By:
+                        Mode:
                     </label>
                     <select id="colorBy">
-                        <option value="depth">Depth</option>
+                        <option value="depth">Folder Depth</option>
                         <option value="ratio">Ratio (Folders)</option>
-                        <option value="type">Type</option>
-                        <option value="fileSize">Size</option>
+                        <option value="type">File Type</option>
+                        <option value="fileSize">File Size</option>
                         <option value="date">Age</option>
                     </select>
                 </div> <!-- Colour By Selection -->
-                <div id="analysisBreakdown">    
-                <div id="typeLegendItems">
-                    <h4>File Type</h4>
-                    <div id="file-type-pie">
+                <div id="analysisBreakdown">
+                    <!-- Type Legend -->
+                    <div id="typeLegendItems">
+                        <h4>File Type</h4>
+                        <div id="file-type-pie"></div>
                     </div>
-                    <!-- <svg id="pie"></svg> -->
-                </div>
-                <div id="ratioLegendItems" class="legend-container hidden">
-                    <h4>Folder Ratio Legend</h4>
-                    <div class="legend-bar" style="background: linear-gradient(to right, black, green, yellow, red);"></div>
-                    <div class="legend-labels">
-                        <span>Empty</span>
-                        <span>7</span>
-                        <span>20</span>
-                        <span>100+</span>
+                    <div id="ratioLegendItems" class="legend-container hidden">
+                        <h4>Folder Ratio</h4>
+                        <div class="legend-bar"
+                            style="background: linear-gradient(to right, black, green, yellow, red);"></div>
+                        <div class="legend-labels">
+                            <span>Empty</span>
+                            <span>7</span>
+                            <span>20</span>
+                            <span>50+</span>
+                        </div>
                     </div>
-                </div>
-                <div id="ratioGraphItems" class="legend-container hidden">
-                    <h4>Ratio Distribution</h4>
-                    <div id="ratio-graph">
-                        <svg id="ratio-histogram"></svg>
+                    <div id="ratioGraphItems" class="legend-container hidden">
+                        <h4>Ratio Distribution</h4>
+                        <div id="ratio-graph">
+                            <svg id="ratio-histogram"></svg>
+                        </div>
                     </div>
-                </div>
-            <div id="dateLegendItems">
-                <h4>Last Modified Date</h4>
-                <svg id="date-graph"></svg>
-                <div id="dateLegendBar" class="legend-bar">
-                </div>
-                <div class="slidecontainer">
-                    <label for="dateCutoff" class="form-label">
-                        Date:
-                        <input type="range" min="0" max="100" class="slider" id="dateCutoff">
-                </label>
-                </div>
-                    <div class="legend-labels">
-                        <span id="minDateLabel"></span>
-                        <span id="maxDateLabel"></span>
+                    <div id="dateLegendItems">
+                        <h4>Last Modified Date</h4>
+                        <label for="relativeDate" class="small-text">Relative Age (Days):</label>
+                        <input type="checkbox" id="relativeDate">
+                        <svg id="date-graph"></svg>
+                        <div class="legend-labels">
+                            <span id="minDateLabel"></span>
+                            <span id="maxDateLabel"></span>
+                        </div>
                     </div>
-                </div>
-                <div id="depthLegendItems">
-                    <h4>Depth</h4>
-                    <div id="depth-graph">
-                        <svg id="depth-histogram"></svg>
-                    </div>
-                    <div id="depthLegendBar" class="legend-bar">
+                    <div id="depthLegendItems">
+                        <h4>Depth</h4>
+                        <div id="depth-graph">
+                            <svg id="depth-histogram"></svg>
+                        </div>
+                        <!-- <div id="depthLegendBar" class="legend-bar"> -->
                     </div>
                 </div>
                 <div id="fileSizeLegendItems">
                     <h4>File Size</h4>
                     <svg id="size-graph"></svg>
                 </div>
-            </div>   <!-- Analysis Breakdown Section -->
-            
-            <div id="searchSummarycontainer" >
-                <p class="detail-item small-text">
-                    <strong>Search Results:</strong> <span id="searchCount"></span>
-                </p>
-                <p class="detail-item small-text">
-                    <strong>Total Size:</strong> <span id="searchSummary"></span>
-                </p>
-                <button id="seeResultsButton">
-                    List Search Results
-                </button>
-                <div>
+                
+                <div id="searchSummarycontainer">
+                    <p class="detail-item small-text">
+                        <strong>Search Criteria </strong> <span id="searchCriteria"></span>
+                    </p>
+                    <p class="detail-item small-text">
+                        <strong>Results:</strong> <span id="searchCount"></span>
+                    </p>
+                    <p class="detail-item small-text">
+                        <strong>Total Size:</strong> <span id="searchSummary"></span>
+                    </p>
+                    <button id="seeResultsButton">
+                        List Search Results
+                    </button>
+                    <div>
                     <button id="filterButton" class="hidden">
-                        Filter
+                        Filter ⊂
                     </button>
                     <button id="filterOutButton" class="hidden">
-                        Filter Out
-                    </button>
-                    <button id="resetButton" class="hidden">
-                        Remove Filter
+                        Filter Out ⊄
                     </button>
                 </div>
             </div>
+                <button id="resetButton2" class="hidden">
+                    Remove Filter ℙ
+                </button>
         </div>
+    </div> <!-- Analysis Breakdown Section -->
     </div>
-</div>
-<div class="settings-box-overlay hidden" id="viewSettingsMenu">
+    <!-- </div> -->
+    <div class="settings-box-overlay hidden" id="viewSettingsMenu">
         <div class="settings-box-content">
             <h3>Settings</h3>
             <div class="controls-buttons">
@@ -246,7 +231,7 @@
                         <option value="sunBurst">Sunburst</option>
                     </select> </a>
 
-                
+
                 <label for="sortBy" class="form-label">
                     Sort By:
                 </label>
@@ -295,7 +280,9 @@
         <div class="settings-box-content">
             <h2>Nircles</h2>
             <p>
-                Nircles is a tool for visualising folder structures using nested circles. It provides an alternative to traditional file explorers, allowing users to explore their file systems in a more intuitive and visually appealing way.
+                Nircles is a tool for visualising folder structures using nested circles. It provides an alternative to
+                traditional file explorers, allowing users to explore their file systems in a more intuitive and
+                visually appealing way.
             </p>
             <p>
                 Created by Gwen Protheroe 2026.
@@ -306,7 +293,7 @@
     </div>
 
     <div class="bottom-grid">
-        <div id="guide" class="settings-box-overlay hidden" >
+        <div id="guide" class="settings-box-overlay hidden">
             <h2>Guide</h2>
             <p>
                 This is a demonstration of alternative folder visualisation techniques. Other examples include branching
@@ -322,8 +309,8 @@
             </p>
         </div>
     </div>
-    </div>
-    </div>
+    <!-- </div> -->
+    <!-- </div> -->
 
     <div id="tooltip" class="tooltip"></div>
     <script>

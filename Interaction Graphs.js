@@ -1,4 +1,25 @@
 // Based on the D3 collapsible tree example
+
+// Helper for tooltips in graphs
+function updateGraphTooltip(event, content) {
+    const tooltip = d3.select("#tooltip");
+    if (content) tooltip.html(content);
+    tooltip.style("opacity", 1);
+    
+    const tooltipNode = tooltip.node();
+    let posX = event.clientX + 15;
+    let posY = event.clientY + 15;
+
+    if (posX + tooltipNode.offsetWidth > window.innerWidth) posX = event.clientX - tooltipNode.offsetWidth - 15;
+    if (posY + tooltipNode.offsetHeight > window.innerHeight) posY = event.clientY - tooltipNode.offsetHeight - 15;
+
+    tooltip.style("transform", `translate(${posX}px, ${posY}px)`);
+}
+
+function hideGraphTooltip() {
+    d3.select("#tooltip").style("opacity", 0);
+}
+
 function InteractionGraphs(data) {
   // Now you can build your charts using 'data'
   //buildAgeHistogram(data);
@@ -28,7 +49,7 @@ function resetAllGraphs(){
 
     // --- DATA PROCESSING ---
     const root = d3.hierarchy(dataset);
-    const allFiles = root.leaves().map((d) => {
+    const allNodes = root.descendants().map((d) => {
       const data = d.data;
       data.depthObject = d.depth;
       return data;
@@ -37,13 +58,13 @@ function resetAllGraphs(){
     // --- SCALES ---
     const x = d3
       .scaleLinear()
-      .domain(d3.extent(allFiles, (d) => d.depthObject))
+      .domain(d3.extent(allNodes, (d) => d.depthObject))
       .nice()
       .range([0, width]);
     const depthCounts = {};
 
-    root.leaves().forEach((leaf) => {
-      const d = leaf.depth;
+    root.descendants().forEach((node) => {
+      const d = node.depth;
       depthCounts[d] = (depthCounts[d] || 0) + 1;
     });
 
@@ -61,7 +82,7 @@ function resetAllGraphs(){
       .domain(x.domain())
       .thresholds(root.height);
 
-    const bins = histogram(allFiles);
+    const bins = histogram(allNodes);
     y.domain([0, d3.max(bins, (d) => d.length)]).nice(); // Scale y based on max count, with some padding
 
     // --- DRAW BARS ---
@@ -79,7 +100,7 @@ function resetAllGraphs(){
     svg
       .append("g")
       .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).tickValues(x.domain()));
+      .call(d3.axisBottom(x).ticks(5, ".0f").tickValues(x.domain()));
 
     svg.append("g").call(d3.axisLeft(y).tickValues(y.domain()));
 
@@ -92,7 +113,18 @@ function resetAllGraphs(){
       ])
       .on("brush end", brushed);
 
-    svg.append("g").attr("class", "brush").call(brush);
+    svg.append("g")
+      .attr("class", "brush")
+      .call(brush)
+      .on("mousemove", (event) => {
+          const [mx] = d3.pointer(event);
+          const val = x.invert(mx);
+          const bin = bins.find(b => val >= b.x0 && val < b.x1);
+          if (bin) {
+              updateGraphTooltip(event, `<strong>Depth: ${bin.x0}</strong><br/>Items: ${bin.length}`);
+          }
+      })
+      .on("mouseout", hideGraphTooltip);
 
     function brushed(event) {
       const selection = event.selection;
@@ -102,13 +134,18 @@ function resetAllGraphs(){
         return;
       }
 
-      // Convert pixel selection back to Dates
-      const [minDate, maxDate] = selection.map(x.invert);
+      // Convert pixel selection back to depth values and snap to nearest integer
+      // to ensure "2.5" logic selects the intended discrete depth level.
+      const [rawMin, rawMax] = selection.map(x.invert);
+      const minD = Math.round(rawMin);
+      const maxD = Math.round(rawMax);
       
-      window.currentFilterFunction = (d) => {
-          return d.depthObject !== undefined && d.depthObject >= minDate && d.depthObject <= maxDate;
+      window.currentFilterFunction = (d, dpt) => {
+          // Use structural depth (dpt) if provided, otherwise fallback to attached property
+          const checkDepth = dpt !== undefined ? dpt : d.depthObject;
+          return checkDepth !== undefined && checkDepth >= minD && checkDepth <= maxD;
       };
-      window.currentFilterDescription = `Depth between ${Math.round(minDate)} and ${Math.round(maxDate)}`;
+      window.currentFilterDescription = `Depth between ${minD} and ${maxD}`;
       if(window.drawVisualization) window.drawVisualization();
     }
   }
@@ -130,21 +167,26 @@ function resetAllGraphs(){
     const root = d3.hierarchy(dataset);
     // Get ratio from folders only
     const folderData = root.descendants()
-        .filter(d => d.children && d.data.folderFileRatio !== undefined)
-        .map(d => d.data);
+        .filter(d => d.data.folderFileRatio !== undefined)
+        .map(d => {
+            return {
+                ...d.data,
+                // Clamp for visual grouping in histogram only
+                displayRatio: Math.min(50, d.data.folderFileRatio)
+            };
+        });
 
     if (folderData.length === 0) return;
 
     const x = d3.scaleLinear()
-      //.domain([0, 20]) // Focus on the 0-20 range as requested
-      .domain(d3.extent(folderData, d => d.folderFileRatio))
+      .domain([0, 50])
       .nice()
       .range([0, width]);
 
     const histogram = d3.bin()
-      .value(d => d.folderFileRatio)
-      .domain(x.domain())
-      .thresholds(x.ticks(12));
+      .value(d => d.displayRatio)
+      .domain([0, 50])
+      .thresholds(d3.range(0, 52, 2)); // Exactly 20 bins (5 units each)
 
     const bins = histogram(folderData);
 
@@ -164,7 +206,7 @@ function resetAllGraphs(){
 
     svg.append("g")
       .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).ticks(5));
+      .call(d3.axisBottom(x).ticks(5).tickFormat(d => d === 50 ? "50+" : d));
 
     svg.append("g").call(d3.axisLeft(y).ticks(5));
 
@@ -181,12 +223,15 @@ function resetAllGraphs(){
 
         const [minR, maxR] = selection.map(x.invert);
         window.currentFilterFunction = (d) => {
-            // Allow files to be visible if their parent is a folder within the ratio range
-            // or if we are filtering the folders themselves.
             const ratio = d.folderFileRatio;
-            return ratio !== undefined && ratio >= minR && ratio <= maxR;
+            if (ratio === undefined) return false;
+            
+            // If selection reaches the 50 mark, treat it as "50 or more" 
+            // to ensure high-ratio outliers aren't filtered out.
+            if (maxR >= 48) return ratio >= minR;
+            return ratio >= minR && ratio <= maxR;
         };
-        window.currentFilterDescription = `Ratio between ${minR.toFixed(1)} and ${maxR.toFixed(1)}`;
+        window.currentFilterDescription = `Ratio ${minR.toFixed(0)} to ${maxR >= 48 ? "50+" : maxR.toFixed(0)}`;
         if(window.drawVisualization) window.drawVisualization();
       });
 
@@ -258,6 +303,11 @@ function resetAllGraphs(){
       .attr("fill", (d) => color(d.data[0]))
       .attr("stroke", "white")
       .attr("cursor", "pointer")
+      .on("mouseover", (event, d) => {
+        updateGraphTooltip(event, `<strong>Type: .${d.data[0]}</strong><br/>Items: ${d.data[1]}`);
+      })
+      .on("mousemove", (event) => updateGraphTooltip(event))
+      .on("mouseout", hideGraphTooltip)
       .on("click", (event, d) => {
         const selectedType = d.data[0];
         if (window.currentFilterDescription === `Type is .${selectedType}`) {
@@ -284,70 +334,82 @@ function resetAllGraphs(){
   }
 
   function buildAgeGraph(dataset) {
-    const margin = { top: 10, right: 40, bottom: 20, left: 50 },
+    const margin = { top: 10, right: 40, bottom: 25, left: 50 },
       width = 220 - margin.left - margin.right,
       height = 125 - margin.top - margin.bottom;
 
-    d3.select("#date-graph").html("");
+    // Clear existing SVG content and reset dimensions
+    const svgElement = d3.select("#date-graph");
+    svgElement.selectAll("*").remove();
 
-    const svg = d3
-      .select("#date-graph")
-      .append("svg")
+    const isRelative = document.getElementById("relativeDate")?.checked;
+    const nowUnix = Date.now() / 1000;
+
+    const svg = svgElement
       .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // 1. Process Data: Count files at each date
+    // 1. Process Data
     const root = d3.hierarchy(dataset);
-      const allFiles = root.leaves().map((d) => {
-      const data = d.data;
-      // Convert Unix (seconds) to JS Date (milliseconds)
-      data.dateObject = new Date(Math.floor(data.last_modified_unix) * 1000);
-      return data;
-    }); 
-    const dateCounts = {};
-    root.leaves().forEach((leaf) => {
-      const d = leaf.data.dateObject;
-      dateCounts[d] = (dateCounts[d] || 0) + 1;
-    });
+    const allFiles = root.leaves()
+      .filter(d => d.data.last_modified_unix)
+      .map((d) => {
+        const data = d.data;
+        // Age in days. Minimum 0.001 to support log scale.
+        data.age = Math.max(0.001, (nowUnix - data.last_modified_unix) / 86400);
+        data.dateObject = new Date(data.last_modified_unix * 1000);
+        return data;
+      });
 
-    // Convert object to sorted array: [{date: 0, count: 5}, ...]
-    const plotData = Object.keys(dateCounts)
-      .map((d) => ({ date: new Date(d), count: dateCounts[d] }))
-      .sort((a, b) => a.date - b.date);
+    if (allFiles.length === 0) return;
 
     // 2. Scales
-    const x = d3
-      .scaleTime()
-      .domain(d3.extent(plotData, (d) => d.date))
-      .range([0, width]);
+    let x;
+    if (isRelative) {
+      x = d3.scaleLog()
+        .domain(d3.extent(allFiles, d => d.age))
+        .range([0, width]);
+    } else {
+      x = d3.scaleTime()
+        .domain(d3.extent(allFiles, d => d.dateObject))
+        .range([0, width]);
+    }
 
-    const y = d3
-      .scaleLinear()
-      .domain([0, d3.max(plotData, (d) => d.count)])
+    // 3. Binning (Histogram)
+    const histogram = d3.bin()
+      .value(d => isRelative ? d.age : d.dateObject)
+      .domain(x.domain())
+      .thresholds(x.ticks(isRelative ? 10 : 20));
+
+    const bins = histogram(allFiles);
+
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(bins, d => d.length)])
       .nice()
       .range([height, 0]);
+
+    // 4. Draw Bars
+    svg.selectAll("rect")
+      .data(bins)
+      .join("rect")
+      .attr("x", d => x(d.x0))
+      .attr("width", d => Math.max(0, x(d.x1) - x(d.x0) - 1))
+      .attr("y", d => y(d.length))
+      .attr("height", d => height - y(d.length))
+      .attr("fill", d => window.linearBWColorScale1(d.x0));
+
+    // 5. Axes
+    const xAxis = isRelative 
+      ? d3.axisBottom(x).ticks(5, ".0f") 
+      : d3.axisBottom(x).ticks(3).tickFormat(d3.timeFormat("%d.%m.%Y"));
 
     svg
       .append("g")
       .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).tickValues(x.domain()).tickFormat(d3.timeFormat("%d.%m.%Y")))
-      .exit().remove(); 
+      .call(xAxis);
 
-    svg.append("g").call(d3.axisLeft(y).tickValues(y.domain()))
-    .exit().remove(); 
-
-    //  Add Dots (to make data points clickable/visible)
-    svg
-      .selectAll(".dot")
-      .data(plotData)
-      .enter()
-      .append("circle")
-      .attr("cx", (d) => x(d.date))
-      .attr("cy", (d) => y(d.count))
-      .attr("r", 5)
-      .attr("fill", (d) => window.linearBWColorScale1(d.date.getTime() / 1000))
-      .exit().remove(); 
+    svg.append("g").call(d3.axisLeft(y).ticks(5));
 
     
     // --- ADD BRUSHING BACK ---
@@ -357,13 +419,31 @@ function resetAllGraphs(){
         [0, 0],
         [width, height],
       ])
-      .on("brush end", brushed);
+      .on("brush end", (event) => {
+          brushed(event, x, isRelative, nowUnix);
+      });
 
-    svg.append("g").attr("class", "brush").call(brush)
-    .exit().remove(); 
+    svg.append("g")
+      .attr("class", "brush")
+      .call(brush)
+      .on("mousemove", (event) => {
+          const [mx] = d3.pointer(event);
+          const val = x.invert(mx);
+          const bin = bins.find(b => val >= b.x0 && val < b.x1);
+          if (bin) {
+              let rangeLabel;
+              if (isRelative) {
+                  rangeLabel = `${bin.x0.toFixed(1)} - ${bin.x1.toFixed(1)} days ago`;
+              } else {
+                  const fmt = d3.timeFormat("%d.%m.%Y");
+                  rangeLabel = `${fmt(bin.x0)} - ${fmt(bin.x1)}`;
+              }
+              updateGraphTooltip(event, `<strong>Range: ${rangeLabel}</strong><br/>Files: ${bin.length}`);
+          }
+      })
+      .on("mouseout", hideGraphTooltip);
 
-
-    function brushed(event) {
+    function brushed(event, x, isRelative, nowUnix) {
       const selection = event.selection;
       if (!selection) {
         window.currentFilterFunction = null;
@@ -372,97 +452,21 @@ function resetAllGraphs(){
         return;
       }
       // Convert pixel selection back to Dates
-      const [minDate, maxDate] = selection.map(x.invert);
+      const [minVal, maxVal] = selection.map(x.invert);
       
       window.currentFilterFunction = (d) => {
-          return d.dateObject !== undefined && d.dateObject >= minDate && d.dateObject <= maxDate;
+          const checkVal = isRelative 
+            ? Math.max(0.001, (nowUnix - d.last_modified_unix) / 86400)
+            : new Date(d.last_modified_unix * 1000);
+          return checkVal >= minVal && checkVal <= maxVal;
       };
-      window.currentFilterDescription = `Date between ${minDate.toLocaleDateString()} and ${maxDate.toLocaleDateString()}`;
+      window.currentFilterDescription = isRelative 
+        ? `Age between ${minVal.toFixed(1)} and ${maxVal.toFixed(1)} days`
+        : `Date between ${minVal.toLocaleDateString()} and ${maxVal.toLocaleDateString()}`;
       if(window.drawVisualization) window.drawVisualization();
     }
-
-  }
-  function buildRatioDepthGraph(dataset) {
-    const margin = { top: 10, right: 25, bottom: 20, left: 25 },
-      width = 220 - margin.left - margin.right,
-      height = 125 - margin.top - margin.bottom;
-
-    const svg = d3
-      .select("#date-graph")
-      .append("svg")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
-      .append("g")
-      .attr("transform", `translate(${margin.left},${margin.top})`);
-
-    // --- DATA PROCESSING ---
-    const root = d3.hierarchy(dataset);
-    const allFiles = root.leaves().map((d) => {
-      const data = d.data;
-      // Convert Unix (seconds) to JS Date (milliseconds)
-      data.depthObject = new Date(data.last_modified_unix * 1000);
-      return data;
-    });
-
-    // --- SCALES ---
-    // Using scaleTime for human-readable axes
-    const x = d3
-      .scaleLinear()
-      .domain(d3.extent(allFiles, (d) => d.depth))
-      .nice()
-      .range([0, width]);
-
-    // Prepare plotData: count files at each depth
-    const depthCounts = {};
-    allFiles.forEach((file) => {
-      const d = file.depth;
-      depthCounts[d] = (depthCounts[d] || 0) + 1;
-    });
-    const plotData = Object.keys(depthCounts)
-      .map((d) => ({ depth: +d, count: depthCounts[d] }))
-      .sort((a, b) => a.depth - b.depth);
-
-    const y = d3
-      .scaleLinear()
-      .domain([0, d3.max(plotData, (d) => d.count)])
-      .nice()
-      .range([height, 0]);
-
-    // 3. Line Generator
-    const line = d3
-      .line()
-      .x((d) => x(d.depth))
-      .y((d) => y(d.count))
-      .curve(d3.curveMonotoneX); // Makes the line smooth
-
-    // 4. Draw Path
-    svg
-      .append("path")
-      .datum(plotData)
-      .attr("fill", "none")
-      .attr("stroke", "#ff6347")
-      .attr("stroke-width", 3)
-      .attr("d", line);
-
-    // 5. Add Dots (to make data points clickable/visible)
-    svg
-      .selectAll(".dot")
-      .data(plotData)
-      .enter()
-      .append("circle")
-      .attr("cx", (d) => x(d.depth))
-      .attr("cy", (d) => y(d.count))
-      .attr("r", 5)
-      .attr("fill", "#ff6347");
-
-    // 6. Axes
-    svg
-      .append("g")
-      .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).tickValues(x.domain()));
-
-    svg.append("g").call(d3.axisLeft(y).tickValues(y.domain()));
-  }
+}
+  
   function buildSizeGraph(dataset) {
     const margin = { top: 10, right: 25, bottom: 20, left: 50 },
       width = 220 - margin.left - margin.right,
@@ -481,12 +485,33 @@ function resetAllGraphs(){
     const root = d3.hierarchy(dataset);
     const allFiles = root.leaves().filter(d => d.data.value > 0).map(d => d.data);
 
+    if (allFiles.length === 0) return;
+
     // --- SCALES ---
-    // Use scaleLinear for file sizes (numeric)
+    const extent = d3.extent(allFiles, (d) => d.value);
+    // Round down to the nearest power of 10 for the min, and up for the max
+       const k = 1024;
+
+    // Round down to the nearest power of 1024 for min, and up for max
+    const domainMin = Math.pow(k, Math.floor(Math.log(extent[0]) / Math.log(k)));
+    const domainMax = Math.pow(k, Math.ceil(Math.log(extent[1]) / Math.log(k)));
+
+    // Generate specific "round" tick values to align with formatBytes logic
+    const tickValues = [];
+    for (let i = 0; i <= 8; i++) {
+        const unitPower = Math.pow(k, i);
+        [1, 10, 100].forEach(multiplier => {
+            const val = unitPower * multiplier;
+            if (val >= domainMin && val <= domainMax) tickValues.push(val);
+        });
+    }
+
+    // If range is very large, take every second or third tick to prevent congestion
+    const finalTicks = tickValues.length > 8 ? tickValues.filter((_, i) => i % 2 === 0) : tickValues;
+
     const x = d3
       .scaleLog()
-      .domain(d3.extent(allFiles, (d) => d.value))
-      .nice()
+      .domain([domainMin, domainMax])
       .range([0, width]);
 
     // --- BINNING ---
@@ -494,7 +519,7 @@ function resetAllGraphs(){
       .bin()
       .value((d) => d.value)
       .domain(x.domain())
-      .thresholds(x.ticks(9));
+      .thresholds(x.ticks(12));
 
     const bins = histogram(allFiles);
 
@@ -518,7 +543,7 @@ function resetAllGraphs(){
     svg
       .append("g")
       .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).ticks(4).tickValues(x.domain()).tickFormat(window.formatBytes));
+      .call(d3.axisBottom(x).tickValues(finalTicks).tickFormat(window.formatBytes));
 
   svg.append("g").call(d3.axisLeft(y).tickValues(y.domain()));
 
@@ -531,7 +556,19 @@ function resetAllGraphs(){
       ])
       .on("brush end", brushed);
 
-    svg.append("g").attr("class", "brush").call(brush);
+    svg.append("g")
+      .attr("class", "brush")
+      .call(brush)
+      .on("mousemove", (event) => {
+          const [mx] = d3.pointer(event);
+          const val = x.invert(mx);
+          const bin = bins.find(b => val >= b.x0 && val < b.x1);
+          if (bin) {
+              const rangeLabel = `${window.formatBytes(bin.x0)} - ${window.formatBytes(bin.x1)}`;
+              updateGraphTooltip(event, `<strong>Size: ${rangeLabel}</strong><br/>Files: ${bin.length}`);
+          }
+      })
+      .on("mouseout", hideGraphTooltip);
 
     function brushed(event) {
       const selection = event.selection;

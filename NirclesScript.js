@@ -42,10 +42,13 @@ document.addEventListener("DOMContentLoaded", function () {
   const viewSettings = document.getElementById("viewSettings");
   const scanSettingsButton = document.getElementById("scanSettingsButton");
   const resetButton = document.getElementById("resetButton");
+  const resetButton2 = document.getElementById("resetButton2");
   let originalFullData = null; // To store the state for Reset
 
   const colorBySelect = document.getElementById("colorBy"); // Single color selection dropdown
-  const dateCutoff = document.getElementById("dateCutoff");
+  const relativeDate = document.getElementById("relativeDate");
+  const minDateLabel = document.getElementById("minDateLabel");
+  const maxDateLabel = document.getElementById("maxDateLabel");
   const sortBySelect = document.getElementById("sortBy");
   const paddingFactorslider = document.getElementById("paddingFactor");
   const ignoreSize = document.getElementById("ignoreSize");
@@ -61,11 +64,13 @@ document.addEventListener("DOMContentLoaded", function () {
   const seeResultsButton = document.getElementById("seeResultsButton"); // Button to view search results
   const searchCount = document.getElementById("searchCount"); // Search result count
   const searchSum = document.getElementById("searchSummary"); // Search result size
+  const searchCriteria = document.getElementById("searchCriteria"); // Search criteria display
 
   const toggleTreeBtn = document.getElementById("toggleTreeBtn");
   const toggleGraphBtn = document.getElementById("toggleGraphBtn");
   const folderTreeColumn = document.getElementById("folder-tree-column");
   const interactionGraphColumn = document.getElementById("interaction-graph-container");
+  const mainGrid = document.querySelector(".main-grid");
 
   let currentDataNodes = []; // Store the flattened nodes for event handling
   let rootNodeData = null; // Store the original root data for full zoom out
@@ -74,6 +79,7 @@ document.addEventListener("DOMContentLoaded", function () {
   let currentZoomNode = window.currentZoomNode ||null; // Track the node currently zoomed into
     let filtered = false;   
     let filterString = "";
+  let activeFilters = [];
   let isAnimating = false;
   let isDragging = false;
   let startX, startY;
@@ -124,9 +130,7 @@ document.addEventListener("DOMContentLoaded", function () {
     .scaleLinear()
     .range(["#98edfa", "#f26e6e"])
     .interpolate(d3.interpolateHslLong); // Rainbow for folder depth
-  const linearBWColorScale1 = d3
-    .scaleLinear()
-    .range(["#000000", "#ebebeb"]); // Shades of black white and orange for file and folder date
+  let linearBWColorScale1 = d3.scaleLinear().range(["#000000", "#ebebeb"]);
   const linearBWColorScale2 = d3.scaleLinear().range(["#009900", "#F2EFEC"]); // Shades of green and white for folder depth
 
   // New color scale for folder ratio
@@ -459,14 +463,14 @@ document.addEventListener("DOMContentLoaded", function () {
   // Apply zoom behavior to the canvas
   d3.select(canvas).call(zoom);
 
- 
-    function filterHierarchy(node, matchesSearch) {
+
+    function filterHierarchy(node, matchesSearch, depth = 0) {
         filtered = true;
     // 1. Always recurse into children first to ensure we don't keep empty folders
     if (node.children && node.children.length > 0) {
       // Recursively filter the children
       const filteredChildren = node.children
-        .map((child) => filterHierarchy(child, matchesSearch))
+        .map((child) => filterHierarchy(child, matchesSearch, depth + 1))
         .filter((child) => child !== null);
 
       // 2. If any children matched, keep this parent node
@@ -475,26 +479,29 @@ document.addEventListener("DOMContentLoaded", function () {
         newNode.children = filteredChildren;
         return newNode;
       }
-      // If folder ended up empty, discard it
+      // If folder contents don't match, check if it matches
+      if (matchesSearch(node, depth)) {
+        return node;
+      } 
       return null;
     }
     // 3. Leaf node (File): Keep if it matches
-    if (matchesSearch(node)) {
+    if (matchesSearch(node, depth)) {
         return { ...node };
     }
     return null;
   }
-  function filteroutHierarchy(node, mismatchesSearch) {
+  function filteroutHierarchy(node, mismatchesSearch, depth = 0) {
             filtered = true;
 // 1. If the current node matches, we remove it and EVERYTHING inside it
-    if (!mismatchesSearch(node)) {
+    if (!mismatchesSearch(node, depth)) {
       return null;
     }
     // 2. If the node doesn't match, check if it has children to explore
     if (node.children && node.children.length >= 0) {
       // Recursively filter the children
       const filteredChildren = node.children
-        .map((child) => filteroutHierarchy(child, mismatchesSearch))
+        .map((child) => filteroutHierarchy(child, mismatchesSearch, depth + 1))
         .filter((child) => child !== null);
 
       // 3. If any children were kept, keep this parent node too
@@ -620,10 +627,12 @@ zoomToNode(currentZoomNode);
   });
   }
 
-  // Event listener for date colour criteria input
-  dateCutoff.addEventListener("input", function () {
-    processAndRenderVisualization(rootNodeData); // Re-draw with new sort criteria
-    zoomToNode(currentZoomNode); 
+
+  // Event listener for relative date toggle
+  relativeDate.addEventListener("change", function () {
+    setColorDomains();
+    initiateVisuals(rootNodeData); // Force rebuild of histograms with new scales
+    drawVisualization();
   });
 
   // Event listener for file size criteria change
@@ -661,15 +670,17 @@ zoomToNode(currentZoomNode);
 
   if (toggleTreeBtn && folderTreeColumn) {
       toggleTreeBtn.addEventListener("click", () => {
-          folderTreeColumn.classList.toggle("hidden");
-          toggleTreeBtn.innerHTML = folderTreeColumn.classList.contains("hidden") ? "&#9654;" : "&#9664;";
+          folderTreeColumn.classList.toggle("collapsed-column");
+          mainGrid?.classList.toggle("hide-left");
+          toggleTreeBtn.innerHTML = folderTreeColumn.classList.contains("collapsed-column") ? "&#9654;" : "&#9664;";
       });
   }
 
   if (toggleGraphBtn && interactionGraphColumn) {
       toggleGraphBtn.addEventListener("click", () => {
-          interactionGraphColumn.classList.toggle("hidden");
-          toggleGraphBtn.innerHTML = interactionGraphColumn.classList.contains("hidden") ? "&#9664;" : "&#9654;";
+          interactionGraphColumn.classList.toggle("collapsed-column");
+          mainGrid?.classList.toggle("hide-right");
+          toggleGraphBtn.innerHTML = interactionGraphColumn.classList.contains("collapsed-column") ? "&#9664;" : "&#9654;";
       });
   }
 
@@ -707,31 +718,28 @@ drawVisualization(); // Redraw to apply search highlighting
         desc += window.currentFilterDescription;
     }
     
-    filterString = filterString + (filterString ? " | " : "") + "Filtered with " + desc;
+    const currentSearchTerm = searchTerm;
+    const currentGraphFilter = window.currentFilterFunction;
     
-    const matchesSearch = (d) => {
-        const term = searchTerm.toLowerCase();
+    const matchesSearch = (d, dpt) => {
+        const term = currentSearchTerm.toLowerCase();
         const nameMatch = term.length < 2 || d.name.toLowerCase().includes(term);
-        // Allow folders to pass the graph filter check so traversal continues.
-        // The drawing loop will hide specific files that don't match.
-        const isFolder = d.children && d.children.length > 0;
-        const graphMatch = !window.currentFilterFunction || window.currentFilterFunction(d);
+        const graphMatch = !currentGraphFilter || currentGraphFilter(d, dpt);
         return nameMatch && graphMatch;
     };
-    // Apply the recursive filter to the current rootNodeData
-    const filteredData = filterHierarchy(rootNodeData, matchesSearch);
 
-    if (filteredData) {
-      rootNodeData = filteredData;
-      processAndRenderVisualization(rootNodeData);
-      resetZoom();
-    } else {
-      displayMessageBox("Filter would remove everything", "Filter removed");
-    }
+    activeFilters.push({
+        desc: "Filtered with " + desc,
+        fn: (data) => filterHierarchy(data, matchesSearch)
+    });
+    applyFilters();
 
-    resetButton.classList.remove("hidden");
+     resetButton.classList.remove("hidden");
+    resetButton2.classList.remove("hidden");
     searchTerm = "";  
     searchInput.value = "";
+    window.currentFilterFunction = null;
+    window.currentFilterDescription = null;
    });
   
   filterOutButton.addEventListener("click", function () {
@@ -747,10 +755,12 @@ drawVisualization(); // Redraw to apply search highlighting
         if (desc) desc += " and ";
         desc += window.currentFilterDescription;
     }
-    filterString = filterString + (filterString ? " | " : "") + "Filtered without " + desc;
 
-    const mismatchesSearch = (d) => {
-        const term = searchTerm.toLowerCase();
+    const currentSearchTerm = searchTerm;
+    const currentGraphFilter = window.currentFilterFunction;
+
+    const mismatchesSearch = (d, dpt) => {
+        const term = currentSearchTerm.toLowerCase();
         // We want to KEEP things that do NOT match the search term
         // But we must also respect the graph filter (keep things that DO match the graph)
         // Folders must pass the graph filter check to ensure we don't prune the tree root.
@@ -758,26 +768,25 @@ drawVisualization(); // Redraw to apply search highlighting
         
         if (term.length >= 2) {
              // Standard: Remove text matches, but keep items within the graph selection
-             return !d.name.toLowerCase().includes(term) && (!window.currentFilterFunction || isFolder || window.currentFilterFunction(d));
+             return !d.name.toLowerCase().includes(term) && (!currentGraphFilter || isFolder || currentGraphFilter(d, dpt));
         } else {
              // No text search: Invert the graph selection (Remove what is brushed)
-             return isFolder || !window.currentFilterFunction || !window.currentFilterFunction(d);
+             return isFolder || !currentGraphFilter || !currentGraphFilter(d, dpt);
         }
     };
-    // Apply the recursive filter to the current rootNodeData but invert the match to filter out
-    const filteredData = filteroutHierarchy(rootNodeData, mismatchesSearch);
 
-    if (filteredData) {
-      rootNodeData = filteredData;
-      processAndRenderVisualization(rootNodeData);
-      resetZoom();
-    } else {
-      displayMessageBox("No results found to filter out.", "Filter would remove everything");
-    }
+    activeFilters.push({
+        desc: "Filtered without " + desc,
+        fn: (data) => filteroutHierarchy(data, mismatchesSearch)
+    });
+    applyFilters();
 
     resetButton.classList.remove("hidden");
+    resetButton2.classList.remove("hidden");
     searchTerm = "";
     searchInput.value = "";
+    window.currentFilterFunction = null;
+    window.currentFilterDescription = null;
   });
   seeResultsButton.addEventListener("click", function () {
     displaySearchResultsBox();  
@@ -791,16 +800,47 @@ viewSettings.addEventListener("click", function () {
 });
 
 
-  resetButton.addEventListener("click", function () {
-    // Restore from the very first loaded dataset
-    rootNodeData = JSON.parse(JSON.stringify(window.originalFullData));
-    resetButton.classList.add("hidden");
-      filtered = false;
-      filterString = "";
-    searchTerm = "";
-    searchInput.value = "";
+  function applyFilters() {
+    let data = JSON.parse(JSON.stringify(window.originalFullData));
+    
+    for (const f of activeFilters) {
+        const nextData = f.fn(data);
+        if (nextData) {
+            data = nextData;
+        } else {
+            displayMessageBox("Filter combination resulted in no data. Reverting.", "Warning");
+            activeFilters.pop();
+            applyFilters();
+            return;
+        }
+    }
+
+    rootNodeData = data;
+    filtered = activeFilters.length > 0;
     processAndRenderVisualization(rootNodeData);
     resetZoom();
+    
+    const isHidden = activeFilters.length === 0;
+    resetButton.classList.toggle("hidden", isHidden);
+    resetButton2.classList.toggle("hidden", isHidden);
+  }
+
+  resetButton.addEventListener("click", function () {
+    activeFilters = [];
+    applyFilters();
+    resetButton.classList.add("hidden");
+    resetButton2.classList.add("hidden");
+    searchTerm = "";
+    searchInput.value = "";
+  });
+
+    resetButton2.addEventListener("click", function () {
+    activeFilters = [];
+    applyFilters();
+    resetButton.classList.add("hidden");
+    resetButton2.classList.add("hidden");
+    searchTerm = "";
+    searchInput.value = "";
   });
   
     // Trigger filter when "Enter" is pressed in the search box
@@ -835,18 +875,15 @@ folderFilterButton.addEventListener("click", function () {
     }
 
     const targetPath = selectedNode.data.path;
-    filterString += (filterString ? " | " : "") + "Focused on " + selectedNode.data.name;
-    
+    const targetName = selectedNode.data.name;
+
     // Reuse filterHierarchy: keep if node is part of the selected folder's subtree
     const matchesSearch = (d) => d.path.startsWith(targetPath);
-    const filteredData = filterHierarchy(rootNodeData, matchesSearch);
-
-    if (filteredData) {
-      rootNodeData = filteredData;
-      processAndRenderVisualization(rootNodeData);
-      resetZoom();
-      resetButton.classList.remove("hidden");
-    }
+    activeFilters.push({
+        desc: "Focused on " + targetName,
+        fn: (data) => filterHierarchy(data, matchesSearch)
+    });
+    applyFilters();
     searchTerm = "";  
     searchInput.value = "";
 });
@@ -860,18 +897,15 @@ folderFilterOutButton.addEventListener("click", function () {
     }
 
     const targetPath = selectedNode.data.path;
-    filterString += (filterString ? " | " : "") + "Excluded " + selectedNode.data.name;
+    const targetName = selectedNode.data.name;
 
     // Reuse filteroutHierarchy: remove if node is part of the selected folder's subtree
     const mismatchesSearch = (d) => !d.path.startsWith(targetPath);
-    const filteredData = filteroutHierarchy(rootNodeData, mismatchesSearch);
-
-    if (filteredData) {
-      rootNodeData = filteredData;
-      processAndRenderVisualization(rootNodeData);
-      resetZoom();
-      resetButton.classList.remove("hidden");
-    }
+    activeFilters.push({
+        desc: "Excluded " + targetName,
+        fn: (data) => filteroutHierarchy(data, mismatchesSearch)
+    });
+    applyFilters();
     searchTerm = "";
     searchInput.value = "";
 });
@@ -942,7 +976,7 @@ folderFilterOutButton.addEventListener("click", function () {
   function processAndRenderVisualization(data) {
         const containerWidth = visualizationColumn.offsetWidth;
     // Set canvas height relative to window height, capped by container width for square aspect
-    const containerHeight = Math.min(containerWidth, window.innerHeight - 150);
+    const containerHeight = Math.min(containerWidth, window.innerHeight - 50);
 
     canvas.width = containerWidth;
     canvas.height = containerHeight;
@@ -966,6 +1000,10 @@ folderFilterOutButton.addEventListener("click", function () {
     
     currentDataNodes = pack(root).descendants();
     const targetNodes = pack(root).descendants();
+
+    // Update zoom target immediately to the new root so resetZoom works correctly
+    currentZoomNode = currentDataNodes[0];
+    window.currentZoomNode = currentZoomNode;
 
     // Calculate folder ratios after packing
     currentDataNodes.forEach(d => {
@@ -1070,15 +1108,21 @@ folderFilterOutButton.addEventListener("click", function () {
   function updateSummary() {
     const directories = currentDataNodes.filter((d) => isaFolder(d));
     const files = currentDataNodes.filter((d) => !isaFolder(d));
-    const ratio = files.length / directories.length;
-    folderSummary.innerHTML = `<div> ${currentDataNodes[0].data.name} contains</div> 
-      <div>${directories.length} folders and ${files.length} files. </div>
-      <div>Total ${currentDataNodes.length} items. Ratio ${ratio.toFixed(1)}</div> 
-      <div>Total size ${formatBytes(currentDataNodes[0].value)} </div>`;
-    if (filtered) {
-      folderSummary.innerHTML = `<div> ${currentDataNodes[0].data.name} filtered ${filterString} contains ${currentDataNodes.length} items. </div>
-      <div>Total size ${formatBytes(currentDataNodes[0].value)} </div>`;
-      }
+
+    let html = `<div><strong>${currentDataNodes[0].data.name}</strong> contains:</div>`;
+    html += `<div>${files.length} Files, ${directories.length} Folders</div>`;
+
+    if (filtered && activeFilters.length > 0) {
+      activeFilters.forEach((f, index) => {
+          html += `<div class="filter-line small-text text-info">
+                    <span>${f.desc}</span>
+                    <span class="remove-filter" data-index="${index}" title="Remove this filter">×</span>
+                   </div>`;
+      });
+    }
+
+    html += `<div class="small-text">Total size: ${formatBytes(currentDataNodes[0].value)}</div>`;
+    folderSummary.innerHTML = html;
   }
   function searchHelper(d) {
     
@@ -1095,7 +1139,7 @@ folderFilterOutButton.addEventListener("click", function () {
     const matchesSearch = (d) => {
         const term = searchTerm.toLowerCase();
         const nameMatch = term.length < 2 || d.data.name.toLowerCase().includes(term);
-        const graphMatch = !window.currentFilterFunction || window.currentFilterFunction(d.data);
+        const graphMatch = !window.currentFilterFunction || window.currentFilterFunction(d.data, d.depth);
         return nameMatch && graphMatch;
     };
 
@@ -1117,6 +1161,7 @@ folderFilterOutButton.addEventListener("click", function () {
       searchResults = "";
       searchCount.textContent = "";
       searchSum.textContent = "";
+      searchCriteria.textContent = "";
       updateSearchResults(searchResults);
     }
 
@@ -1347,15 +1392,23 @@ folderFilterOutButton.addEventListener("click", function () {
 
   // Search functionality
   function searchLogic(matchesSearch) {
-    const match = currentDataNodes.filter(matchesSearch).length;
-    const matchSum = currentDataNodes.filter(matchesSearch);
+    const matchedNodes = currentDataNodes.filter(matchesSearch);
+    const match = matchedNodes.length;
+    const matchfolder = matchedNodes.filter((d) => isaFolder(d)).length;
     let thisSum = 0;
-    matchSum.forEach((d) => {
+    matchedNodes.forEach((d) => {
       thisSum = thisSum + d.value;
     });
 
-    searchCount.textContent = match + " items";
+    searchCount.textContent = matchfolder + " folders and " + (match - matchfolder) + " files";
     searchSum.textContent = formatBytes(thisSum);
+
+    // Build and display criteria description
+    let criteria = [];
+    if (searchTerm.length > 1) criteria.push(`Name contains "${searchTerm}"`);
+    if (window.currentFilterDescription) criteria.push(window.currentFilterDescription);
+    searchCriteria.textContent = criteria.join(" AND ");
+
     //White background if searching for something
     ctx.beginPath();
     ctx.arc(
@@ -1592,17 +1645,44 @@ folderFilterOutButton.addEventListener("click", function () {
     );
     categoricalColorScale.domain(fileTypes);
 
+    const isRelative = relativeDate.checked;
+    const nowUnix = Date.now() / 1000;
+
     const allDates = currentDataNodes
       .filter((d) => d.data.last_modified_unix)
-      .map((d) => d.data.last_modified_unix);
+      .map((d) => {
+        if (isRelative) {
+          // Age in days. Minimum 0.001 (approx 1.5 mins) to allow log scales.
+          return Math.max(0.001, (nowUnix - d.data.last_modified_unix) / 86400);
+        }
+        return d.data.last_modified_unix;
+      });
+
     const minDate = d3.min(allDates);
     const maxDate = d3.max(allDates);
     const dateRange = maxDate - minDate;
 
+    if (isRelative) {
+      // Use log scale for relative age. Newer items (smaller value) are lighter.
+      linearBWColorScale1 = d3.scaleLog()
+        .range(["#ebebeb", "#000000"])
+        .domain([minDate, maxDate]);
+      
+      minDateLabel.textContent = minDate.toFixed(2) + " days old";
+      maxDateLabel.textContent = maxDate.toFixed(1) + " days old";
+    } else {
+      // Use linear scale for absolute time. Newer items (larger timestamp) are lighter.
+      linearBWColorScale1 = d3.scaleLinear()
+        .range(["#000000", "#ebebeb"]);
+        
+      linearBWColorScale1.domain([minDate, maxDate]);
 
-    const chosenDate = maxDate - (dateCutoff.value / 100) * dateRange;
+      minDateLabel.textContent = minDate ? new Date(minDate * 1000).toLocaleDateString() : "";
+      maxDateLabel.textContent = maxDate ? new Date(maxDate * 1000).toLocaleDateString() : "";
+    }
+    
+    window.linearBWColorScale1 = linearBWColorScale1;
     linearBWColorScale2.domain([minDate, maxDate]);
-    linearBWColorScale1.domain([chosenDate, maxDate]);
 
     const allFileSizes = currentDataNodes
       .filter((d) => !isaFolder(d))
@@ -1624,6 +1704,13 @@ folderFilterOutButton.addEventListener("click", function () {
   // Function to get color based on selected option
   function getNodeColor(d) {
     const colorMode = colorBySelect.value;
+    const isRelative = relativeDate.checked;
+    const nowUnix = Date.now() / 1000;
+
+    let dateValue = d.data.last_modified_unix;
+    if (dateValue && isRelative) {
+      dateValue = Math.max(0.001, (nowUnix - dateValue) / 86400);
+    }
 
     if (isaFolder(d)) {
       // Folder coloring logic
@@ -1634,7 +1721,7 @@ folderFilterOutButton.addEventListener("click", function () {
       } else if (colorMode === "depth") {
         return linearRainbowColorScale(d.depth);
       } else if (colorMode === "date") {
-        return d.data.last_modified_unix ? linearBWColorScale1(d.data.last_modified_unix) : "#888";
+        return dateValue ? linearBWColorScale1(dateValue) : "#888";
       } else if (colorMode === "fileSize") {
         return exponentialColorScale(d.value);
       }
@@ -1648,7 +1735,7 @@ folderFilterOutButton.addEventListener("click", function () {
       } else if (colorMode === "depth") {
         return linearRainbowColorScale(d.depth);
       } else if (colorMode === "date") {
-        return d.data.last_modified_unix ? linearBWColorScale1(d.data.last_modified_unix) : "#ccc";
+        return dateValue ? linearBWColorScale1(dateValue) : "#ccc";
       } else if (colorMode === "fileSize") {
         return exponentialColorScale(d.value);
       }
@@ -1707,7 +1794,7 @@ folderFilterOutButton.addEventListener("click", function () {
     currentZoomNode = node;
 }
   function resetZoom() {
-    //currentZoomNode = currentDataNodes[0];
+    currentZoomNode = currentDataNodes[0];
     zoomToNode(currentZoomNode);
   }
 
@@ -1851,8 +1938,22 @@ function exportCanvasAsPNG() {
     const mouseX = (event.clientX - rect.left - transform.x) / transform.k;
     const mouseY = (event.clientY - rect.top - transform.y) / transform.k;
 
-    // Move tooltip smoothly on every mouse move by updating its transform
-    tooltip.style("transform", `translate(${event.clientX + 15}px, ${event.clientY + 15}px)`);
+    // Calculate tooltip position to prevent overflowing the viewport and causing scrollbars
+    const tooltipNode = tooltip.node();
+    const tooltipWidth = tooltipNode.offsetWidth;
+    const tooltipHeight = tooltipNode.offsetHeight;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let posX = event.clientX + 15;
+    let posY = event.clientY + 15;
+
+    // Flip tooltip to the left if it would overflow the right edge
+    if (posX + tooltipWidth > viewportWidth) posX = event.clientX - tooltipWidth - 15;
+    // Flip tooltip upwards if it would overflow the bottom edge
+    if (posY + tooltipHeight > viewportHeight) posY = event.clientY - tooltipHeight - 15;
+
+    tooltip.style("transform", `translate(${posX}px, ${posY}px)`);
 
     let foundNode = null;
     // Iterate through nodes in reverse order to detect smaller, top-most circles first
@@ -2041,6 +2142,14 @@ function exportCanvasAsPNG() {
     }
   }
 
+  folderSummary.addEventListener("click", function(e) {
+    if (e.target.classList.contains("remove-filter")) {
+      const index = parseInt(e.target.getAttribute("data-index"));
+      activeFilters.splice(index, 1);
+      applyFilters();
+    }
+  });
+
   // Custom message box function (replaces alert)
   function displayMessageBox(message, type = "Info") {
     const messageBox = document.createElement("div");
@@ -2096,7 +2205,7 @@ function exportCanvasAsPNG() {
       if (entry.target === visualizationColumn) {
         const newWidth = entry.contentRect.width;
         // Set new height relative to window height, capped by newWidth for square aspect
-        const newHeight = Math.min(newWidth, window.innerHeight - 150);
+        const newHeight = Math.min(newWidth, window.innerHeight - 50);
 
         if (canvas.width !== newWidth || canvas.height !== newHeight) {
           canvas.width = newWidth;
