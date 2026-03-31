@@ -21,7 +21,7 @@
 body {
   font-family: "Roboto", sans-serif;
   background-color: var(--Silver, #3a3835);
-  min-height: 100vh;
+  min-height: 95vh;
   margin: 2px;
   padding: 8px;
   display: flex;
@@ -43,7 +43,7 @@ body {
    width: 99%;
   display: flex;
   flex-direction: column;
-  flex-grow: 1;
+  /* flex-grow: 1; */
 }
 
 /* Grid Layout */
@@ -55,8 +55,18 @@ body {
 }
 @media (min-width: 768px) {
   .main-grid {
-    grid-template-columns: 250px 1fr 250px;
+    grid-template-columns: minmax(0, auto) 1fr minmax(0, auto);
     gap: 4px;
+    transition: grid-template-columns 0.3s ease;
+  }
+  .main-grid.hide-left {
+    grid-template-columns: 0 1fr minmax(0, auto);
+  }
+  .main-grid.hide-right {
+    grid-template-columns: minmax(0, auto) 1fr 0;
+  }
+  .main-grid.hide-left.hide-right {
+    grid-template-columns: 0 1fr 0;
   }
 }
 
@@ -65,6 +75,7 @@ body {
 .interaction-graph-column,
 .details-column {
   grid-column: span 1 / span 1;
+  width: 250px;
   background-color: var(--fog, #f2efec);
   padding: 4px;
   border-radius: 0.5rem;
@@ -73,6 +84,14 @@ body {
   display: flex;  
   overflow: auto;  
   flex-direction: column;
+  transition: width 0.3s ease, padding 0.3s ease;
+}
+
+.collapsed-column {
+  width: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
 }
 
 @media (max-width: 767px) {
@@ -101,7 +120,7 @@ body {
     flex-direction: column;
     justify-content: space-between;
     align-items: left;
-    border-radius: 5px;
+  border-radius: 0.5rem;
     min-width: 100%;
   }
   #toggleControls {
@@ -222,21 +241,21 @@ input[type="range"] {
 
 .toggle-side-panel-btn {
   position: absolute;
-  top: 10px;
+  top: 4px;
   z-index: 20;
   padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.8);
+  background: 888;
   border: 1px solid #ccc;
   border-radius: 4px;
   cursor: pointer;
 }
 
 #toggleTreeBtn {
-  left: 10px;
+  left: 4px;
 }
 
 #toggleGraphBtn {
-  right: 10px;
+  right: 4px;
 }
 @media (min-width: 768px) {
   #visualizationColumn {
@@ -245,7 +264,7 @@ input[type="range"] {
 }
 #folderViz {
   background-color: var(--Silver, #a9aca9);
-  border-radius: 2.5rem;
+  border-radius: 0.5rem;
   box-shadow: 0 6px 6px 0 rgba(0, 0, 0, 0.1);
   cursor: crosshair;
   display: block;
@@ -391,8 +410,8 @@ input[type="range"] {
 text {
   font-family: "Roboto", sans-serif;
   fill: black;
-  stroke: white;
-  stroke-width: 3;
+  /* stroke: white; */
+  /* stroke-width: 3; */
   font-size: 16px;
   paint-order: stroke fill;
 }
@@ -403,7 +422,7 @@ text {
   top: 0;
   left: 0;
   text-align: left;
-  padding: 10px 15px;
+  padding: 6px 6px;
   background: rgba(40, 40, 40, 0.85);
   color: #f0f0f0;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -412,7 +431,7 @@ text {
   opacity: 0;
   /* Use transform for smooth movement and opacity for fade */
   transition: opacity 0.3s ease, transform 0.1s ease-out;
-  font-size: 14px;
+  font-size: 12px;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
   max-width: 300px;
   word-wrap: break-word;
@@ -498,6 +517,21 @@ text {
 .text-info {
   color: var(--Orange);
 }
+.filter-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(49, 124, 237, 0.05);
+  padding: 2px 6px;
+  margin: 2px 0;
+  border-radius: 4px;
+}
+.remove-filter {
+  cursor: pointer;
+  color: var(--error);
+  font-weight: bold;
+  margin-left: 8px;
+}
 
 .search-result-item {
   cursor: pointer;
@@ -546,6 +580,11 @@ text {
   height: auto;
 }
 
+/* Reduce font size for histogram labels and axes to prevent congestion */
+.interaction-graph-column svg text {
+  font-size: 10px;
+}
+
 #file-type-pie text {
   text-anchor: middle;
   font-size: 16px;
@@ -556,8 +595,9 @@ text {
 .navbar {
   overflow: hidden;
   display: grid;
-  grid-template-columns: 250px 1fr 200px auto;
+  grid-template-columns: 180px 1fr 260px auto;
   width: 100%;
+  height: 40px;
   /* position: sticky; */
   background-color: #888;
 }
@@ -665,7 +705,7 @@ text {
   background-color: #f9f9f9;
   /* min-width: 160px; */
   box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
-  z-index: 1;
+  z-index: 40;
 }
 
 .dropdown-content a {
