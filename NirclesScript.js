@@ -526,10 +526,70 @@ document.addEventListener("DOMContentLoaded", function () {
   //////////////////////////////////////////////////////////////////////////////
   //Event listener for "New Scan" button
   // when we have the scanning functionality, this will trigger the scan and then load the resulting JSON, for now it just loads the default data again.
-  newScanButton.addEventListener("click", function () {
-    // Placeholder for scan functionality
-    displayMessageBox("Scan functionality coming soon! For now, this button reloads the default demo data.", "Info");
-    resetButton.click();
+  newScanButton.addEventListener("click", async function () {
+    try {
+      // In Tauri v2, plugins are accessed via specific global objects
+      const dialog = window.__TAURI_PLUGIN_DIALOG__;
+      const shell = window.__TAURI_PLUGIN_SHELL__;
+      const fs = window.__TAURI_PLUGIN_FS__;
+
+      if (!dialog || !shell || !fs) {
+        throw new Error("Tauri plugins not found. Ensure you are running the app with 'npm run tauri dev' and that the plugins are installed.");
+      }
+
+      // 1. Open folder selection window
+      const selectedFolder = await dialog.open({
+        directory: true,
+        multiple: false,
+        title: 'Select a folder to scan'
+      });
+      if (!selectedFolder) return;
+
+      displayMessageBox(`Initiating scan for: ${selectedFolder}. This may take a moment...`, "Info");
+
+      // 2. Execute scanner.py
+      // Note: 'python' must be configured in your tauri.conf.json allowlist/capabilities
+      const command = shell.Command.create('python', ['scanner.py', selectedFolder]);
+      const result = await command.execute();
+
+      if (result.stderr) {
+        console.error("Scanner Error Stream:", result.stderr);
+      }
+
+      // 3. Extract JSON from the output stream using markers
+      const output = result.stdout;
+      const startMarker = "RESULT_START";
+      const endMarker = "RESULT_END";
+      const startIndex = output.indexOf(startMarker);
+      const endIndex = output.indexOf(endMarker);
+
+      if (startIndex === -1 || endIndex === -1) {
+        throw new Error("The scanner script did not return a valid result block.");
+      }
+
+      const jsonString = output.substring(startIndex + startMarker.length, endIndex).trim();
+      const scannedData = JSON.parse(jsonString);
+
+      // 4. Update the view
+      rootNodeData = scannedData;
+      window.originalFullData = JSON.parse(JSON.stringify(rootNodeData));
+      processAndRenderVisualization(rootNodeData);
+      updateBreadcrumbs();
+      displayMessageBox("Scan complete! Visualization updated.", "Success");
+
+      // 5. Finally saved as a json summary
+      const savePath = await dialog.save({
+        defaultPath: `${scannedData.name}_scan.json`,
+        filters: [{name: 'JSON', extensions: ['json']}]
+      });
+
+      if (savePath) {
+        await fs.writeTextFile(savePath, JSON.stringify(scannedData, null, 2));
+      }
+    } catch (err) {
+      displayMessageBox("Scan failed: " + err.message, "Error");
+      console.error(err);
+    }
   });
 
   // Event listener for the "Load JSON File" button
@@ -976,8 +1036,10 @@ folderFilterOutButton.addEventListener("click", function () {
   // Function to process data and then draw
   function processAndRenderVisualization(data) {
         const containerWidth = visualizationColumn.offsetWidth;
-    // Set canvas height relative to window height, capped by container width for square aspect
-    const containerHeight = Math.min(containerWidth, window.innerHeight - 50);
+    // Calculate available height based on window size and component position
+    const rect = visualizationColumn.getBoundingClientRect();
+    const availableHeight = window.innerHeight - rect.top - 60; 
+    const containerHeight = Math.max(300, Math.min(containerWidth, availableHeight));
 
     canvas.width = containerWidth;
     canvas.height = containerHeight;
@@ -2205,8 +2267,10 @@ function exportCanvasAsPNG() {
     for (let entry of entries) {
       if (entry.target === visualizationColumn) {
         const newWidth = entry.contentRect.width;
-        // Set new height relative to window height, capped by newWidth for square aspect
-        const newHeight = Math.min(newWidth, window.innerHeight - 50);
+        // Calculate available height based on window size and component position
+        const rect = visualizationColumn.getBoundingClientRect();
+        const availableHeight = window.innerHeight - rect.top - 60;
+        const newHeight = Math.max(300, Math.min(newWidth, availableHeight));
 
         if (canvas.width !== newWidth || canvas.height !== newHeight) {
           canvas.width = newWidth;
