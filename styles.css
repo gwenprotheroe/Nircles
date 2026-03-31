@@ -595,8 +595,9 @@ text {
 .navbar {
   overflow: hidden;
   display: grid;
-  grid-template-columns: 250px 1fr 200px auto;
+  grid-template-columns: 180px 1fr 260px auto;
   width: 100%;
+  height: 40px;
   /* position: sticky; */
   background-color: #888;
 }

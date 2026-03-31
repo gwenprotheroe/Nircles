@@ -40,6 +40,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const NircleButton = document.getElementById("NircleButton");
   const sunBurstButton = document.getElementById("sunBurstButton");
   const viewSettings = document.getElementById("viewSettings");
+  const visStyle = document.getElementById("visStyle");
   const scanSettingsButton = document.getElementById("scanSettingsButton");
   const resetButton = document.getElementById("resetButton");
   const resetButton2 = document.getElementById("resetButton2");
@@ -455,9 +456,9 @@ document.addEventListener("DOMContentLoaded", function () {
     })
     .on("end", () => {
       // VITAL: Update the D3 zoom state so panning starts from THIS position
-        drawHighlights(); // Sync overlay with zoom
-        d3.select(canvas).property("__zoom", newTransform); 
-        isAnimating = false;
+      d3.select(canvas).property("__zoom", newTransform); 
+      isAnimating = false;
+      drawHighlights(); // Sync overlay with zoom
     });
 
   // Apply zoom behavior to the canvas
@@ -1297,7 +1298,7 @@ folderFilterOutButton.addEventListener("click", function () {
           1.3 * Math.min(canvas.width, canvas.height) > relSize &&
           relSize > 100); // Visible size range
 
-      if (isVisibleInZoom && !isAnimating) {
+      if (isVisibleInZoom) {
         const text = d.data.name;
         ctx.globalAlpha = 1.0; // Reset opacity
         titleFont = "Roboto, sans-serif";
@@ -1310,7 +1311,7 @@ folderFilterOutButton.addEventListener("click", function () {
           textangle = -30;
         }
         //Folder Text
-        if (d.children) {
+        if (isaFolder(d)) {
           var fontSizeTitle = 18 / (transform.k * 1.2);
           if (d === currentZoomNode) {
             fontSizeTitle = fontSizeTitle * 2;
@@ -1372,20 +1373,20 @@ folderFilterOutButton.addEventListener("click", function () {
     overlayCtx.lineWidth = 4 / transform.k;
     overlayCtx.stroke();
 
-    // Draw label on top
-    const titleFont = "Roboto, sans-serif";
-    const text = d.data.name;
-    let textangle = 30;
-    if (isEven(d.depth)) textangle = -30;
+    // // Draw label on top
+    // const titleFont = "Roboto, sans-serif";
+    // const text = d.data.name;
+    // let textangle = 30;
+    // if (isEven(d.depth)) textangle = -30;
 
-    if (d.children) {
-        var fontSizeTitle = 18 / (transform.k * 1.2);
-        if (d === currentZoomNode) fontSizeTitle = fontSizeTitle * 2;
-        drawCircularText(overlayCtx, text, fontSizeTitle, titleFont, d.x, d.y, d.r, textangle, 0);
-    } else {
-        var fontSize = 14 / transform.k;
-        drawFileText(overlayCtx, text, fontSize, titleFont, d.x, d.y, d.r * 0.75, 0, 0);
-    }
+    // if (d.children) {
+    //     var fontSizeTitle = 18 / (transform.k * 1.2);
+    //     if (d === currentZoomNode) fontSizeTitle = fontSizeTitle * 2;
+    //     drawCircularText(overlayCtx, text, fontSizeTitle, titleFont, d.x, d.y, d.r, textangle, 0);
+    // } else {
+    //     var fontSize = 14 / transform.k;
+    //     drawFileText(overlayCtx, text, fontSize, titleFont, d.x, d.y, d.r * 0.75, 0, 0);
+    // }
 
     overlayCtx.restore();
   }
@@ -1982,7 +1983,7 @@ function exportCanvasAsPNG() {
         // Add common details first
         details += `<br/><strong>Type: </strong>${isaFolder(hoveredNode) ? 'Folder' : hoveredNode.data.type || 'N/A'}`;
         details += `<br/><strong>Size: </strong>${formatBytes(hoveredNode.value)}`;
-        details += `<br/><strong>Modified: </strong>${hoveredNode.data.last_modified_iso ? new Date(hoveredNode.data.last_modified_unix * 1000).toLocaleString() : "N/A"}`;
+        details += `<br/><strong>Modified: </strong>${hoveredNode.data.last_modified_iso ? new Date(hoveredNode.data.last_modified_unix * 1000).toLocaleDateString() : "N/A"}`;
         details += `<br/><strong>Depth: </strong>${hoveredNode.depth}`;
 
         // Add ratio for folders if applicable
@@ -2085,15 +2086,15 @@ function exportCanvasAsPNG() {
     const subFolders = directories.length - 1; // Exclude the selected folder itself
     const ratio = subFolders === 0 ? files.length : files.length / subFolders;
 
-    detailChildren.innerHTML = `${directories.length} folders and ${files.length} files.
-      <div>Total ${selectedNode.descendants().length} items. Ratio ${ratio.toFixed(2)}</div> `;
+    detailChildren.innerHTML = `${directories.length} folders and ${files.length} files
+      <div><strong>Ratio: </strong>${ratio.toFixed(2)}</div> `;
       } else {
         folderSpecificActions.classList.add("hidden");
         detailChildren.textContent = "";
       }
       detailSize.textContent = formatBytes(selectedNode.value);
       detailLastModified.textContent = selectedNode.data.last_modified_iso
-        ? new Date(selectedNode.data.last_modified_unix * 1000).toLocaleString()
+        ? new Date(selectedNode.data.last_modified_unix * 1000).toLocaleDateString()
         : "N/A";
       if (selectedNode.data.children) {
         detailPath.textContent = node.data.path;
