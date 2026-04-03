@@ -1,6 +1,6 @@
 // Based on the D3 collapsible tree example
-function createFolderTree(data, containerSelector) {
-  const width = 200,
+export function createFolderTree(data, containerSelector) {
+  const width = 250,
     minHeight = 800;
   const barHeight = 20;
 
@@ -117,9 +117,10 @@ function createFolderTree(data, containerSelector) {
    function updateXY(node){
      if(!node) return;
      node.index = index++;
-    if(node.children){
-        for(let i=0;i<node.children.length;i++){
-           updateXY(node.children[i])
+    const kids = node.children;
+    if(kids){
+        for(let i=0;i<kids.length;i++){
+           updateXY(kids[i])
         }
      }
       } 

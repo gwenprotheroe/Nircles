@@ -1,6 +1,9 @@
 // Nircles Main Script
 // Copywrite Gwen Protheroe 2026
 
+import { createFolderTree } from './folderTree.js';
+import { InteractionGraphs } from './InteractionGraphs.js'; 
+
 document.addEventListener("DOMContentLoaded", function () {
   const canvas = document.getElementById("folderViz");
   const ctx = canvas.getContext("2d");
@@ -77,6 +80,7 @@ document.addEventListener("DOMContentLoaded", function () {
   let rootNodeData = null; // Store the original root data for full zoom out
   let hoveredNode = window.hoveredNode || null; // Track the node currently under the mouse
   let selectedNode = window.selectedNode ||null; // Track the node currently selected by click for details panel
+  let searchResults = []; // Shared search results state
   let currentZoomNode = window.currentZoomNode ||null; // Track the node currently zoomed into
     let filtered = false;   
     let filterString = "";
@@ -456,7 +460,7 @@ document.addEventListener("DOMContentLoaded", function () {
     })
     .on("end", () => {
       // VITAL: Update the D3 zoom state so panning starts from THIS position
-      d3.select(canvas).property("__zoom", newTransform); 
+      d3.select(canvas).property("__zoom", transform); 
       isAnimating = false;
       drawHighlights(); // Sync overlay with zoom
     });
@@ -532,6 +536,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const dialog = window.__TAURI_PLUGIN_DIALOG__;
       const shell = window.__TAURI_PLUGIN_SHELL__;
       const fs = window.__TAURI_PLUGIN_FS__;
+      const pathApi = window.__TAURI_PLUGIN_PATH__;
 
       if (!dialog || !shell || !fs) {
         throw new Error("Tauri plugins not found. Ensure you are running the app with 'npm run tauri dev' and that the plugins are installed.");
@@ -1016,12 +1021,9 @@ folderFilterOutButton.addEventListener("click", function () {
   }
 
   function initiateVisuals(data) {
-    if (typeof InteractionGraphs === 'function') {
-      InteractionGraphs(data, '#interaction-graph-container');
-    }
-    if (typeof createFolderTree === 'function') {
-      createFolderTree(data, '#folder-tree-container');
-    }
+    InteractionGraphs(data);
+    createFolderTree(data, '#folder-tree-container');
+
     if (typeof createSunburst === 'function') {
       createSunburst(data, '#sunburst-container');
     }
@@ -1195,6 +1197,19 @@ folderFilterOutButton.addEventListener("click", function () {
   function drawVisualization() {
     const minRadius = 1.2;
     ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the entire canvas
+
+    // Draw a consistent background so visualization is visible in all themes
+    ctx.beginPath();
+    ctx.arc(
+      canvas.width / 2,
+      canvas.height / 2,
+      Math.max(canvas.width, canvas.height),
+      0,
+      2 * Math.PI,
+    );
+    ctx.fillStyle = "#F2EFEC"; 
+    ctx.fill();
+
     updateSummary ();
     applyCurrentZoom();
 
@@ -1221,7 +1236,7 @@ folderFilterOutButton.addEventListener("click", function () {
       searchSummary.classList.remove("hidden");
       filterButton.classList.add("hidden");
       filterOutButton.classList.add("hidden");
-      searchResults = "";
+      searchResults = [];
       searchCount.textContent = "";
       searchSum.textContent = "";
       searchCriteria.textContent = "";
@@ -1363,7 +1378,7 @@ folderFilterOutButton.addEventListener("click", function () {
       if (isVisibleInZoom) {
         const text = d.data.name;
         ctx.globalAlpha = 1.0; // Reset opacity
-        titleFont = "Roboto, sans-serif";
+        const titleFont = "Roboto, sans-serif";
         // Dim non-matching nodes if a search term is active
         if (isFiltering && !matchesSearch(d)) {
           ctx.globalAlpha = 0.12; // Reduce opacity
@@ -1483,7 +1498,7 @@ folderFilterOutButton.addEventListener("click", function () {
     );
     ctx.fillStyle = "#F2EFEC";
     ctx.fill();
-    const searchResults = Array.from(
+    searchResults = Array.from(
       new Set(currentDataNodes.filter(matchesSearch)),
     );
     updateSearchResults(searchResults);
@@ -1917,7 +1932,7 @@ folderFilterOutButton.addEventListener("click", function () {
       const pack = d3
           .pack()
           .size([containerWidth, containerHeight])
-          .padding(Math.log10(d.value));
+          .padding(Math.pow(paddingFactorslider.value / 1200, 2));
       //.padding(Math.pow(paddingFactorslider.value / 1200, 2));
 
     const targetNodes = pack(root).descendants();
@@ -2161,8 +2176,12 @@ function exportCanvasAsPNG() {
       if (selectedNode.data.children) {
         detailPath.textContent = node.data.path;
       } else {
-        detailPath.textContent =
-          selectedNode.data.path + "\\" + selectedNode.data.name;
+        // Use path join for cross-platform reliability if pathApi is available
+        if (window.__TAURI_PLUGIN_PATH__) {
+            window.__TAURI_PLUGIN_PATH__.join(selectedNode.data.path, selectedNode.data.name).then(p => detailPath.textContent = p);
+        } else {
+            detailPath.textContent = selectedNode.data.path + (navigator.platform.includes("Win") ? "\\" : "/") + selectedNode.data.name;
+        }
       }
   }
 

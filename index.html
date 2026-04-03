@@ -8,7 +8,7 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Roboto" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/src/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 </head>
 
@@ -162,15 +162,15 @@
                     </div>
                     <div id="ratioGraphItems" class="legend-container hidden">
                         <h4>Ratio Distribution</h4>
-                        <div id="ratio-graph">
-                            <svg id="ratio-histogram"></svg>
+                        <div id="ratio-graph" class="graph-container">
+                            <div id="ratio-histogram"></div>
                         </div>
                     </div>
                     <div id="dateLegendItems">
                         <h4>Last Modified Date</h4>
                         <label for="relativeDate" class="small-text">Relative Age (Days):</label>
                         <input type="checkbox" id="relativeDate">
-                        <svg id="date-graph"></svg>
+                        <div id="date-graph"></div>
                         <div class="legend-labels">
                             <span id="minDateLabel"></span>
                             <span id="maxDateLabel"></span>
@@ -367,9 +367,7 @@
 
     </script>
 
-    <script src="NirclesScript.js"></script>
-    <script src="Interaction Graphs.js"></script>
-    <script src="folderTree.js"></script>
+<script type="module" src="/src/NirclesScript.js"></script>
 </body>
 
 </html>
