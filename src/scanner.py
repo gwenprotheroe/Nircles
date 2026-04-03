@@ -33,7 +33,8 @@ def scan_folder(root_path: str, max_depth: int, follow_links: bool):
         "name": os.path.basename(root_path) or root_path,
         "type": "folder",
         "path": root_path,
-        "lastModified": mtime_iso,
+        "last_modified_unix": mtime,
+        "last_modified_iso": mtime_iso,
         "value": 1,
         "children": []
     }
@@ -57,7 +58,7 @@ def scan_folder(root_path: str, max_depth: int, follow_links: bool):
                         
                         if entry_canonical in visited_canonicals: continue
                         
-                        _, m_iso = stat_times(entry_path)
+                        m_unix, m_iso = stat_times(entry_path)
                         
                         if entry.is_dir(follow_symlinks=follow_links):
                             visited_canonicals.add(entry_canonical)
@@ -65,7 +66,8 @@ def scan_folder(root_path: str, max_depth: int, follow_links: bool):
                                 "name": entry.name,
                                 "type": "folder",
                                 "path": entry_path,
-                                "lastModified": m_iso,
+                                "last_modified_unix": m_unix,
+                                "last_modified_iso": m_iso,
                                 "value": 1,
                                 "children": []
                             }
@@ -75,13 +77,17 @@ def scan_folder(root_path: str, max_depth: int, follow_links: bool):
                             
                             # Progress pulse for Neutralino
                             folder_count += 1
+                            if folder_count % 50 == 0:
+                                print(f"SCAN_PROGRESS: {folder_count} folders found...", flush=True)
                         else:
+                            ext = os.path.splitext(entry.name)[1][1:].lower() or "file"
                             file_node = {
                                 "name": entry.name,
-                                "type": "file",
+                                "type": ext,
                                 "path": entry_path,
                                 "value": get_size(entry_path),
-                                "lastModified": m_iso
+                                "last_modified_unix": m_unix,
+                                "last_modified_iso": m_iso
                             }
                             path_to_node[curr_path]["children"].append(file_node)
                     except: continue

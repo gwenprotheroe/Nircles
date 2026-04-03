@@ -20,7 +20,7 @@ function hideGraphTooltip() {
     d3.select("#tooltip").style("opacity", 0);
 }
 
-function InteractionGraphs(data) {
+export function InteractionGraphs(data) {
   // Now you can build your charts using 'data'
   //buildAgeHistogram(data);
   buildDepthHistogram(data);
