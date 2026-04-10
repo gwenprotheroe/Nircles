@@ -17,35 +17,33 @@
     <div class="navbar" id="navbar">
         <div class="menu-container">
             <div class="fileMenu">
-                <button class="dropbtn" onclick="dropdown('fileDropdown')">File</button>
-                <div id="fileDropdown" class="dropdown-content">
+                <button class="dropbtn" onclick="dropdown('orgDropdown')">File</button>
+                <div id="orgDropdown" class="dropdown-content">
                     <a id="newScanButton">New Scan</a>
                     <a id="saveScanButton">Save Scan</a>
                     <a id="loadJsonFileButton" href="#">Load Scan</a>
                     <input type="file" id="jsonFileLoad" accept=".json">
+                    <a id="ScanSettings" href="#">Scan Settings</a>
                     <a id="exportPngButton">Export Image</a>
                     <a id="exportSvgButton" href="#">Export SVG</a>
                     <a id="closeApp" href="#">Close</a>
                 </div>
             </div>
-            <div class="editMenu hidden">
+            <div class="editMenu">
                 <button class="dropbtn" onclick="dropdown('editDropdown')">Edit</button>
                 <div id="editDropdown" class="dropdown-content">
-                    <a href="#">Undo</a>
+                    <a id="newFolderButton" href="#">New Folder</a>
+                    <a id="renameButton" href="#">Rename</a>
                     <a href="#">Redo</a>
                     <a href="#">Move</a>
                     <a href="#">Copy</a>
                     <a href="#">Delete</a>
-                    <a id="ScanSettings" href="#">Scan Settings</a>
                 </div>
             </div>
             <div class="viewMenu">
                 <button class="dropbtn" onclick="dropdown('viewDropdown')">View</button>
                 <div id="viewDropdown" class="dropdown-content">
                     <a id="viewSettings" href="#">View Settings</a>
-                    <a id="NavMode" href="#">Navigation Mode</a>
-                    <a id="AnalysisMode" href="#">Analysis Mode</a>
-                    <a id="EditingMode" href="#">Editing Mode</a>
                     <a id="zoomOutButton" href="#">Reset Zoom</a>
                 </div>
             </div>
@@ -117,7 +115,21 @@
                         <button id="folderFilterButton" class="small-btn">Filter ⊂</button>
                         <button id="folderFilterOutButton" class="small-btn">Filter out ⊄</button>
                     </div>
+                    <div id="itemContextActions" class="changes-actions" style="margin-top: 10px;">
+                        <!-- Contextual buttons like Rename/New Folder will be injected here -->
+                    </div>
                 </div>
+                
+                <!-- Search Results Summary (Replaces Selected Item when searching) -->
+                <div id="searchResultSummary" class="hidden">
+                    <h3>Search Results</h3>
+                    <p class="detail-item"><strong>Matched:</strong> <span id="summaryMatchCount"></span></p>
+                    <p class="detail-item"><strong>Total Size:</strong> <span id="summaryTotalSize"></span></p>
+                    <div class="changes-made-box" style="background-color: rgba(49, 124, 237, 0.1); border-color: var(--Orange);">
+                        <p class="small-text" style="margin-bottom: 0;"><strong>Organize Tip:</strong> Drag any highlighted item to move the entire result set to a new folder.</p>
+                    </div>
+                </div>
+
                 <div id="initialDetailsPrompt">
                     <p>
                         Click on any item to see its details here.
@@ -126,6 +138,13 @@
             </div>
             <div id="visualizationColumn" class="visualization-column">
                 <button id="toggleTreeBtn" title="Toggle Folder Tree" class="toggle-side-panel-btn">&#9664;</button>
+                
+                <!-- Interaction Toggle -->
+                <div class="interaction-toggle-container">
+                    <button id="panModeBtn" class="toggle-btn active" title="Pan and Zoom View"><i class="fa fa-arrows"></i> Pan</button>
+                    <button id="orgModeBtn" class="toggle-btn" title="Drag to Reorganize"><i class="fa fa-hand-rock-o"></i> Organize</button>
+                </div>
+
                 <button id="toggleGraphBtn" title="Toggle Graphs" class="toggle-side-panel-btn">&#9654;</button>
                 <canvas id="folderViz"></canvas>
             </div>
@@ -169,7 +188,7 @@
                     <div id="dateLegendItems">
                         <h4>Last Modified Date</h4>
                         <label for="relativeDate" class="small-text">Relative Age (Days):</label>
-                        <input type="checkbox" id="relativeDate">
+                        <input type="checkbox" checked="checked" id="relativeDate">
                         <svg id="date-graph"></svg>
                         <div class="legend-labels">
                             <span id="minDateLabel"></span>
@@ -209,11 +228,27 @@
                     <button id="filterOutButton" class="hidden">
                         Filter Out ⊄
                     </button>
+                    <button id="deleteMatchButton" class="small-btn hidden" style="margin-top: 5px; background-color: var(--error);">
+                        Delete Matched Items
+                    </button>
+                    <button id="emptyFolderSelectButton" class="small-btn" style="margin-top: 5px;">
+                        Select Empty Folders
+                    </button>
                 </div>
             </div>
                 <button id="resetButton2" class="hidden">
                     Remove Filter ℙ
                 </button>
+
+                <!-- Changes Made Summary -->
+                <div id="changesMadeContainer" class="changes-made-box hidden">
+                    <h4>Changes Pending</h4>
+                    <div id="changesList" class="changes-list small-text"></div>
+                    <div class="changes-actions">
+                        <button id="applyChangesBtn" class="small-btn">Apply</button>
+                        <button id="revertChangesBtn" class="small-btn">Revert All</button>
+                    </div>
+                </div>
         </div>
     </div> <!-- Analysis Breakdown Section -->
     </div>
@@ -313,6 +348,14 @@
     <!-- </div> -->
 
     <div id="tooltip" class="tooltip"></div>
+
+    <!-- Right-click Context Menu -->
+    <div id="contextMenu" class="context-menu hidden">
+        <div class="context-menu-item" id="ctxRename">Rename</div>
+        <div class="context-menu-item" id="ctxNewFolder">New Folder</div>
+        <div class="context-menu-item" id="ctxDelete" style="color: var(--error);">Delete</div>
+    </div>
+
     <script>
 
         function navbarResponse() {
