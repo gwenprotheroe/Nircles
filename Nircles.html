@@ -71,17 +71,15 @@
         </a>
     </div>
     <div class="addressbar">
-        <div class="detail-item hidden">
-            <strong>Breadcrumbs:</strong> <span id="breadcrumbs"></span>
+        <div class="address-bar-content">
+            <i class="fa fa-desktop address-root-icon" title="This Computer"></i>
+            <div id="breadcrumbs" class="breadcrumbs-list"></div>
+            <!-- Hidden element to maintain JS compatibility without visual clutter -->
+            <span id="detailPath" class="hidden"></span>
         </div>
-        <p class="detail-item">
-            <strong>Full Path:</strong> <span id="detailPath"></span>
-        </p>
-        <div class="output-group">
-            <button id="copyPathButton">
-                Copy Path
-            </button>
-        </div>
+        <button id="copyPathButton" title="Copy full path to clipboard">
+            Copy Path
+        </button>
     </div>
     <div class="container-wrapper">
         <div class="main-grid">
@@ -138,30 +136,49 @@
             </div>
             <div id="visualizationColumn" class="visualization-column">
                 <button id="toggleTreeBtn" title="Toggle Folder Tree" class="toggle-side-panel-btn">&#9664;</button>
-                
-                <!-- Interaction Toggle -->
-                <div class="interaction-toggle-container">
-                    <button id="panModeBtn" class="toggle-btn active" title="Pan and Zoom View"><i class="fa fa-arrows"></i> Pan</button>
-                    <button id="orgModeBtn" class="toggle-btn" title="Drag to Reorganize"><i class="fa fa-hand-rock-o"></i> Organize</button>
-                </div>
+               
 
                 <button id="toggleGraphBtn" title="Toggle Graphs" class="toggle-side-panel-btn">&#9654;</button>
                 <canvas id="folderViz"></canvas>
             </div>
             <div id="interaction-graph-container" class="interaction-graph-column">
-                <div class="input-group">
+                <!-- Refactored Control Panel -->
+                <div id="depthSliderContainer" class="depth-control-panel">
                     <h2>Controls</h2>
-                    <label for="colorBy" class="form-label">
-                        Mode:
-                    </label>
-                    <select id="colorBy">
-                        <option value="depth">Folder Depth</option>
-                        <option value="ratio">Ratio (Folders)</option>
-                        <option value="type">File Type</option>
-                        <option value="fileSize">File Size</option>
-                        <option value="date">Age</option>
-                    </select>
-                </div> <!-- Colour By Selection -->
+                    <div class="control-row">
+                        <!-- Left Side: Inverted Depth Slider -->
+                        <div class="slider-group">
+                            <div class="depth-slider-labels">
+                                <span>Shallow</span>
+                                <div class="depth-value-readout">
+                                    <span class="readout-label"> View</span>
+                                    <span class="readout-label"> Depth</span>
+                                    <span id="depthLabel">2.0</span>
+                                </div>
+                                <span>∞</span>
+                            </div>
+                            <input type="range" id="depthVisibilitySlider" class="depth-slider" min="1" max="5" value="2" step="0.1">
+                        </div>
+
+                        <!-- Right Side: Interaction and Color -->
+                        <div class="mode-group">
+                            <label class="form-label">Interaction</label>
+                            <div class="interaction-toggle-container">
+                                <button id="panModeBtn" class="toggle-btn active" title="Pan and Zoom View"><i class="fa fa-arrows"></i> Navigate</button>
+                                <button id="orgModeBtn" class="toggle-btn" title="Drag to Reorganize"><i class="fa fa-hand-rock-o"></i> Organise</button>
+                            </div>
+
+                            <label for="colorBy" class="form-label">Colour Mode</label>
+                            <select id="colorBy">
+                                <option value="depth">Folder Depth</option>
+                                <option value="ratio">Ratio</option>
+                                <option value="type">Type</option>
+                                <option value="fileSize">Size</option>
+                                <option value="date">Age</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
                 <div id="analysisBreakdown">
                     <!-- Type Legend -->
                     <div id="typeLegendItems">
@@ -291,7 +308,7 @@
                     Hide labels
                 </label>
                 <br>
-                <input type="checkbox" id="hexagonalFiles" value="Yes">
+                <input type="checkbox" id="hexagonalFiles" value="Yes" checked>
                 <label for="hexagonalFiles">
                     Hexagonal Files
                 </label>

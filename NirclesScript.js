@@ -97,20 +97,31 @@ document.addEventListener("DOMContentLoaded", function () {
   let currentDataNodes = []; // Store the flattened nodes for event handling
   let rootNodeData = null; // Store the original root data for full zoom out
   let hoveredNode = window.hoveredNode || null; // Track the node currently under the mouse
-  let selectedNode = window.selectedNode ||null; // Track the node currently selected by click for details panel
+  let selectedNode = window.selectedNode || null; // Primary selected node
+  let selectedNodes = new Set(); // For multi-selection
   let currentZoomNode = window.currentZoomNode ||null; // Track the node currently zoomed into
-    let isOrganizeMode = false;
-    let draggedNode = null; // Track the node currently being dragged
-    let isMovingSearchSet = false; // Track if we are moving multiple items via search
-    let pendingChanges = [];
-    let hasUnsavedChanges = false;
-    let filtered = false;   
-    let filterString = "";
+  let visualZoomDepth = 0; // Interpolated depth for smooth alpha transitions
+  let maxVisibleDepthRelative = 3.2; // Default 3.2 levels deep
+
+  let userSelectedMode = false; // Tracks the button-selected mode (Navigate/Org)
+  let isOrganizeMode = false;
+  let draggedNode = null; // Track the node currently being dragged
+  let isMovingSearchSet = false; // Track if we are moving multiple items via search
   let activeFilters = [];
+  let pendingChanges = [];
+  let hasUnsavedChanges = false;
+  let filtered = false;
+  let filterString = "";
   let isAnimating = false;
   let isDragging = false;
   let startX, startY;
   const dragThreshold = 5; // Minimum pixels moved to count as a drag
+
+  // Get references to the depth slider elements (now assumed to be in HTML)
+  const depthSliderContainer = document.getElementById("depthSliderContainer");
+  const depthVisibilitySlider = document.getElementById("depthVisibilitySlider");
+  const depthLabel = document.getElementById("depthLabel");
+
 
   // D3 Zoom transform state (k for scale, x/y for translate)
   let transform = d3.zoomIdentity;
@@ -156,7 +167,7 @@ document.addEventListener("DOMContentLoaded", function () {
     .scaleLinear()
     .range(["#98edfa", "#f26e6e"])
     .interpolate(d3.interpolateHslLong); // Rainbow for folder depth
-  let linearBWColorScale1 = d3.scaleLinear().range(["#000000", "#ebebeb"]);
+  let linearBWColorScale1 = d3.scaleLinear().range(["#eee","#222"]); // Black and white for date modified
   const linearBWColorScale2 = d3.scaleLinear().range(["#009900", "#F2EFEC"]); // Shades of green and white for folder depth
 
   // New color scale for folder ratio
@@ -519,7 +530,8 @@ document.addEventListener("DOMContentLoaded", function () {
   const drag = d3.drag()
     .on("start", (event) => {
         if (!isOrganizeMode) return;
-        const node = findNodeAt(event.x, event.y);
+        // Use the currently hovered node or find the node at the mouse position
+        const node = hoveredNode || findNodeAt(event.sourceEvent.clientX, event.sourceEvent.clientY);
         if (node) {
             event.subject.node = node;
             canvas.style.cursor = "grabbing";
@@ -540,20 +552,27 @@ document.addEventListener("DOMContentLoaded", function () {
     })
     .on("drag", (event) => {
         if (!isOrganizeMode || !event.subject.node) return;
+        const rect = canvas.getBoundingClientRect();
         // Update current position in data space
-        draggedNode.currentX = (event.x - transform.x) / transform.k;
-        draggedNode.currentY = (event.y - transform.y) / transform.k;
+        draggedNode.currentX = (event.sourceEvent.clientX - rect.left - transform.x) / transform.k;
+        draggedNode.currentY = (event.sourceEvent.clientY - rect.top - transform.y) / transform.k;
 
         // Detect if we are hovering over a potential target folder during the drag
-        hoveredNode = findNodeAt(event.x, event.y);
+        hoveredNode = findNodeAt(event.sourceEvent.clientX, event.sourceEvent.clientY);
 
         drawHighlights(); // Redraw ghost and line
     })
     .on("end", (event) => {
         if (!isOrganizeMode || !event.subject.node) return;
         canvas.style.cursor = "grab";
-        const targetNode = findNodeAt(event.x, event.y);
+        
+        let targetNode = findNodeAt(event.sourceEvent.clientX, event.sourceEvent.clientY);
         const sourceNode = event.subject.node;
+
+        // Improvement: If the target is a file, redirect the drop to its parent folder
+        if (targetNode && !isaFolder(targetNode)) {
+            targetNode = targetNode.parent;
+        }
 
         if (targetNode && targetNode !== sourceNode && isaFolder(targetNode)) {
             // Sync changes to Master Data to preserve across filter resets
@@ -622,11 +641,17 @@ document.addEventListener("DOMContentLoaded", function () {
   function findNodeAt(rawX, rawY) {
       const rect = canvas.getBoundingClientRect();
       // Transform screen coordinates to visualization coordinates
-      const x = (rawX - transform.x) / transform.k;
-      const y = (rawY - transform.y) / transform.k;
+      const x = (rawX - rect.left - transform.x) / transform.k;
+      const y = (rawY - rect.top - transform.y) / transform.k;
+      const zoomDepth = currentZoomNode ? currentZoomNode.depth : 0;
 
       for (let i = currentDataNodes.length - 1; i >= 0; i--) {
           const d = currentDataNodes[i];
+          
+          // Respect the depth filter for selectability
+          const relativeDepth = d.depth - zoomDepth;
+          if (maxVisibleDepthRelative < 10 && relativeDepth > Math.ceil(maxVisibleDepthRelative)) continue;
+
           const dx = x - d.x;
           const dy = y - d.y;
           if (Math.sqrt(dx * dx + dy * dy) < d.r) {
@@ -757,6 +782,7 @@ document.addEventListener("DOMContentLoaded", function () {
         window.currentFilterFunction = null; // Clear any graph filters
         window.currentFilterDescription = null; 
         updateBreadcrumbs();
+        animateDepthShowcase();
 
       } catch (error) {
         displayMessageBox(
@@ -846,7 +872,7 @@ document.addEventListener("DOMContentLoaded", function () {
             <p>${message}</p>
             <div style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
                 <button id="confirmActionBtn">Yes</button>
-                <button id="cancelActionBtn" style="background-color: var(--AshGrey);">No</button>
+                <button id="cancelActionBtn" style="background-color: var(--Black);">No</button>
             </div>
         </div>
     `;
@@ -890,15 +916,127 @@ document.addEventListener("DOMContentLoaded", function () {
   newFolderButton.addEventListener("click", () => window.triggerNewFolder(selectedNode));
 
   // Interaction Toggle Logic
-  panModeBtn.addEventListener("click", () => setInteractionMode(false));
-  orgModeBtn.addEventListener("click", () => setInteractionMode(true));
+  panModeBtn.addEventListener("click", () => {
+      userSelectedMode = false;
+      setInteractionMode(false);
+  });
+  orgModeBtn.addEventListener("click", () => {
+      userSelectedMode = true;
+      setInteractionMode(true);
+  });
 
   function setInteractionMode(organize) {
     isOrganizeMode = organize;
     panModeBtn.classList.toggle("active", !organize);
     orgModeBtn.classList.toggle("active", organize);
     canvas.style.cursor = organize ? "grab" : "crosshair";
+    
+    // Visual cue: darken background when in Organize mode
+    canvas.style.transition = "background-color 0.3s ease";
+    canvas.style.backgroundColor = organize ? "#1e1e26" : "";
   }
+
+  // Keyboard Shortcuts
+  window.addEventListener("keydown", (e) => {
+      const isInputActive = e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA";
+
+      // Shift toggle between Navigate and Organise
+      if (e.key === "Shift") {
+          setInteractionMode(!userSelectedMode);
+      }
+      
+      // F1: Help
+      if (e.key === "F1") {
+          e.preventDefault();
+          displayAboutBox();
+      }
+
+      // F2: Rename
+      if (e.key === "F2" && !isInputActive) {
+          e.preventDefault();
+          if (selectedNode) window.triggerRename(selectedNode);
+      }
+
+      // Delete: Bulk or single deletion
+      if (e.key === "Delete" && !isInputActive) {
+          if (selectedNodes.size > 1) {
+              displayConfirmationBox(`Delete all ${selectedNodes.size} selected items?`, () => {
+                  selectedNodes.forEach(node => {
+                      const masterParent = findInMaster(node.parent.data);
+                      const masterNode = findInMaster(node.data);
+                      if (masterParent && masterNode) {
+                          masterParent.children = masterParent.children.filter(c => c !== masterNode);
+                      }
+                  });
+                  selectedNodes.clear();
+                  selectedNode = null;
+                  applyFilters();
+              });
+          } else if (selectedNode) {
+              window.triggerDelete(selectedNode);
+          }
+      }
+
+      // Escape: Clear selection and close popups
+      if (e.key === "Escape") {
+          selectedNodes.clear();
+          selectedNode = null;
+          selectedItemDetails.classList.add("hidden");
+          document.getElementById("aboutPopup").classList.add("hidden");
+          document.getElementById("viewSettingsMenu").classList.add("hidden");
+          document.getElementById("searchPopup").classList.add("hidden");
+          drawVisualization();
+      }
+
+      // Global Ctrl shortcuts
+      if (e.ctrlKey || e.metaKey) {
+          if (e.key.toLowerCase() === "f") {
+              e.preventDefault();
+              searchInput.focus();
+              searchInput.select();
+          }
+          if (e.key.toLowerCase() === "s") {
+              e.preventDefault();
+              saveScanButton.click();
+          }
+          if (e.key === "+" || e.key === "=") {
+              e.preventDefault();
+              maxVisibleDepthRelative = Math.min(5, maxVisibleDepthRelative + 0.5);
+              depthVisibilitySlider.value = maxVisibleDepthRelative;
+              depthLabel.textContent = maxVisibleDepthRelative >= 5 ? "Deep" : maxVisibleDepthRelative.toFixed(1);
+              drawVisualization();
+          }
+          if (e.key === "-") {
+              e.preventDefault();
+              maxVisibleDepthRelative = Math.max(1, maxVisibleDepthRelative - 0.5);
+              depthVisibilitySlider.value = maxVisibleDepthRelative;
+              depthLabel.textContent = maxVisibleDepthRelative >= 5 ? "Deep" : maxVisibleDepthRelative.toFixed(1);
+              drawVisualization();
+          }
+          if (e.key.toLowerCase() === "a" && !isInputActive) {
+              e.preventDefault();
+              const target = currentZoomNode || currentDataNodes[0];
+              if (target && target.children) {
+                  target.children.forEach(child => selectedNodes.add(child));
+                  selectedNode = target.children[0];
+                  selectedNodeDetails(selectedNode);
+                  drawVisualization();
+              }
+          }
+      }
+  });
+
+  window.addEventListener("keyup", (e) => {
+      if (e.key === "Shift") {
+          setInteractionMode(userSelectedMode);
+      }
+  });
+
+  depthVisibilitySlider.addEventListener("input", (e) => {
+      maxVisibleDepthRelative = parseFloat(e.target.value);
+      depthLabel.textContent = maxVisibleDepthRelative >= 5 ? "Deep" : maxVisibleDepthRelative.toFixed(1);
+      drawVisualization();
+  });
 
   // Reusable Rename Logic
   window.triggerRename = function(node) {
@@ -1513,7 +1651,7 @@ folderFilterOutButton.addEventListener("click", function () {
     .sum((d) => {
         const val = parseFloat(d.value) || 0;
         // Ensure empty folders have a minimum weight so they are rendered as circles.
-        if (d.parent && (d.type === "folder" || d.type === "Folder") && (!d.children || d.children.length === 0) && val === 0) {
+        if (d.parent && (d.type === "folder" || d.type === "Folder") && (!d.children || d.children.length === 0) && val < 2) {
           var minNewSize = Math.max(1000, d.parent.value * 0.2); // 20% of parent's effective value or 1000 bytes
             return minNewSize; 
         }
@@ -1531,9 +1669,19 @@ folderFilterOutButton.addEventListener("click", function () {
     const pack = d3.pack()
         .size([containerWidth, containerHeight])
         .padding(d => {
+            const numChildren = d.children ? d.children.length : 0;
             const ratio = d.data ? (d.data.folderFileRatio || 0) : 0;
-            const basePadding = Math.pow(parseFloat(paddingFactorslider.value) / 1200, 2);
-            // Inversely proportional: High density folders get thinner borders
+            const basePadding = Math.pow(parseFloat(paddingFactorslider.value) / 2000, 2);
+
+            // Special handling for single-item folders:
+            // We enforce a minimum padding of 5px to ensure there is always a 
+            // visible and clickable "rim" around the lone child.
+            if (numChildren <= 1) {
+                return Math.max(basePadding, 5);
+            }
+
+            // For multi-item folders, use the density-aware padding:
+            // High density folders get thinner borders to maximize screen real estate.
             return basePadding / (1 + (ratio / 7));
         });
 
@@ -1699,6 +1847,8 @@ folderFilterOutButton.addEventListener("click", function () {
 
     // Determine if any filtering is active (Search text OR Graph brush)
     const isFiltering = searchTerm.length > 1 || window.currentFilterFunction !== null;
+    const zoomDepth = currentZoomNode ? currentZoomNode.depth : 0;
+
 
     if (isFiltering) {
       searchLogic(matchesSearch);
@@ -1725,6 +1875,10 @@ folderFilterOutButton.addEventListener("click", function () {
       .sort((a, b) => b.r - a.r);
     directories.forEach((d) => {
       if (isInViewport(d)) {
+        
+        const relativeDepth = d.depth - zoomDepth;
+        const isBeyondDepth = maxVisibleDepthRelative < 5 && relativeDepth > maxVisibleDepthRelative;
+
         if ( // Only draw if it's above the minimum radius threshold or matches the search term
           d.r * transform.k > minRadius ||
           (isFiltering && matchesSearch(d))
@@ -1744,7 +1898,7 @@ folderFilterOutButton.addEventListener("click", function () {
           }
           let lineWidth = 0.5 / transform.k;
 
-          if (d === selectedNode ||
+          if (selectedNodes.has(d) ||
               d === currentZoomNode) {
             strokeColor = "#ff7e27"; // Orange for active states
             lineWidth = 5 / transform.k;
@@ -1758,13 +1912,23 @@ folderFilterOutButton.addEventListener("click", function () {
           ctx.strokeStyle = strokeColor;
           ctx.lineWidth = lineWidth;
 
-          ctx.globalAlpha = 1.0; // Reset opacity
-          // Dim non-matching nodes if a search term is active
+          let baseAlpha = 1.0;
+// Dim non-matching nodes if a search term is active
           if (isFiltering && !matchesSearch(d)) {
-            ctx.globalAlpha = 0.12; // Reduce opacity
-          }
+baseAlpha = 0.12; // Reduce opacity     
+}
+
+          // Smooth Information Depth Filter
+          if (maxVisibleDepthRelative < 5) {
+              const depthAlpha = Math.max(0.00, Math.min(1.0, maxVisibleDepthRelative - (relativeDepth - 1)));
+              baseAlpha *= depthAlpha;
+            }
+          ctx.globalAlpha = baseAlpha;
+
+
           ctx.fill();
           ctx.stroke();
+
 
           // --- NEW FOLDER PULSE EFFECT ---
           if (d.data.creationTime && Date.now() - d.data.creationTime < 3000) {
@@ -1789,6 +1953,11 @@ folderFilterOutButton.addEventListener("click", function () {
     const files = currentDataNodes.filter((d) => !isaFolder(d));
     files.forEach((d) => {
       if (isInViewport(d)) {
+        const relativeDepth = d.depth - visualZoomDepth;
+
+        // Performance Optimization: Skip drawing entirely if beyond the horizon
+        if (maxVisibleDepthRelative < 5 && relativeDepth > Math.ceil(maxVisibleDepthRelative) + 1) return;
+
         if (
           d.r * transform.k > minRadius ||
           (isFiltering && matchesSearch(d))
@@ -1822,7 +1991,7 @@ folderFilterOutButton.addEventListener("click", function () {
           }
           let lineWidth = 0.5 / transform.k;
 
-          if (d === selectedNode) {
+          if (selectedNodes.has(d)) {
             lineWidth = 2.5 / transform.k;
           }
 
@@ -1833,13 +2002,19 @@ folderFilterOutButton.addEventListener("click", function () {
 
           ctx.strokeStyle = strokeColor;
           ctx.lineWidth = lineWidth;
-          //ctx.stroke();
 
-          ctx.globalAlpha = 1.0; // Reset opacity
+          let baseAlpha = 1.0;
           // Dim non-matching nodes if a search term is active
           if (isFiltering && !matchesSearch(d)) {
-            ctx.globalAlpha = 0.12; // Reduce opacity
+            baseAlpha = 0.12; // Reduce opacity
           }
+          
+          // Smooth Information Depth Filter (Opacity only)
+          if (maxVisibleDepthRelative < 5) {
+              const depthAlpha = Math.max(0.001, Math.min(1.0, maxVisibleDepthRelative - (relativeDepth - 1)));
+              baseAlpha *= depthAlpha;
+          }
+          ctx.globalAlpha = baseAlpha;
           ctx.fill();
           ctx.stroke();
         }
@@ -1861,6 +2036,11 @@ folderFilterOutButton.addEventListener("click", function () {
           1.3 * Math.min(canvas.width, canvas.height) > relSize &&
           relSize > 100); // Visible size range
 
+      const relativeDepth = d.depth - visualZoomDepth;
+      
+      // Skip labels entirely if beyond the horizon
+      if (maxVisibleDepthRelative < 5 && relativeDepth > Math.ceil(maxVisibleDepthRelative) + 0.5) return;
+
       if (isVisibleInZoom) {
         const text = d.data.name;
         ctx.globalAlpha = 1.0; // Reset opacity
@@ -1869,6 +2049,7 @@ folderFilterOutButton.addEventListener("click", function () {
         if (isFiltering && !matchesSearch(d)) {
           ctx.globalAlpha = 0.12; // Reduce opacity
         }
+
         let textangle = 30;
         if (isEven(d.depth)) {
           textangle = -30;
@@ -1932,7 +2113,20 @@ folderFilterOutButton.addEventListener("click", function () {
     if (draggedNode) {
         // Draw ghost circle
         overlayCtx.beginPath();
-        overlayCtx.arc(draggedNode.currentX, draggedNode.currentY, draggedNode.r, 0, 2 * Math.PI);
+        if (!isaFolder(draggedNode) && hexagonalFiles.checked) {
+            const polySides = 6;
+            for (let i = 0; i < polySides; i++) {
+                const angle = (2 * Math.PI / polySides) * i;
+                const x = draggedNode.currentX + draggedNode.r * Math.sin(angle);
+                const y = draggedNode.currentY + draggedNode.r * Math.cos(angle);
+                if (i === 0) overlayCtx.moveTo(x, y);
+                else overlayCtx.lineTo(x, y);
+            }
+            overlayCtx.closePath();
+        } else {
+            overlayCtx.arc(draggedNode.currentX, draggedNode.currentY, draggedNode.r, 0, 2 * Math.PI);
+        }
+        
         overlayCtx.fillStyle = "rgba(255, 255, 255, 0.3)"; // Semi-transparent white
         overlayCtx.strokeStyle = "#ffa135";
         overlayCtx.lineWidth = 2 / transform.k;
@@ -1949,12 +2143,49 @@ folderFilterOutButton.addEventListener("click", function () {
         overlayCtx.stroke();
         overlayCtx.setLineDash([]); // Reset line dash
 
-        // Highlight target folder during drag to aid the user in placement
-        if (hoveredNode && hoveredNode !== draggedNode && isaFolder(hoveredNode)) {
+        // Calculate the actual landing zone (files redirect to parent)
+        let effectiveTarget = hoveredNode;
+        if (effectiveTarget && !isaFolder(effectiveTarget)) {
+            effectiveTarget = effectiveTarget.parent;
+        }
+
+        // Validity check: Not itself, not current parent, and not a descendant
+        let isValid = false;
+        if (effectiveTarget && effectiveTarget !== draggedNode && effectiveTarget !== draggedNode.parent) {
+            let temp = effectiveTarget;
+            let isDescendant = false;
+            while (temp) {
+                if (temp === draggedNode) {
+                    isDescendant = true;
+                    break;
+                }
+                temp = temp.parent;
+            }
+            if (!isDescendant) isValid = true;
+        }
+
+        // Highlight target folder for a valid move
+        if (isValid && effectiveTarget) {
             overlayCtx.beginPath();
-            overlayCtx.arc(hoveredNode.x, hoveredNode.y, hoveredNode.r, 0, 2 * Math.PI);
-            overlayCtx.strokeStyle = "#317ced"; // Nircles Blue target highlight
+            overlayCtx.arc(effectiveTarget.x, effectiveTarget.y, effectiveTarget.r, 0, 2 * Math.PI);
+            overlayCtx.strokeStyle = "var(--NirclesBlue, #317ced)";
             overlayCtx.lineWidth = 6 / transform.k;
+            overlayCtx.stroke();
+        } 
+        // Show an "X" icon near the ghost if hovering over an invalid target
+        else if (hoveredNode) {
+            const xSize = 7 / transform.k;
+            const xPos = draggedNode.currentX + draggedNode.r + (10 / transform.k);
+            const yPos = draggedNode.currentY - draggedNode.r - (10 / transform.k);
+            
+            overlayCtx.beginPath();
+            overlayCtx.moveTo(xPos - xSize, yPos - xSize);
+            overlayCtx.lineTo(xPos + xSize, yPos + xSize);
+            overlayCtx.moveTo(xPos + xSize, yPos - xSize);
+            overlayCtx.lineTo(xPos - xSize, yPos + xSize);
+            
+            overlayCtx.strokeStyle = "#dc2626"; // Error Red
+            overlayCtx.lineWidth = 3 / transform.k;
             overlayCtx.stroke();
         }
 
@@ -1971,7 +2202,19 @@ folderFilterOutButton.addEventListener("click", function () {
     else if (hoveredNode) {
         const d = hoveredNode;
         overlayCtx.beginPath();
-        overlayCtx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
+        if (!isaFolder(d) && hexagonalFiles.checked) {
+            const polySides = 6;
+            for (let i = 0; i < polySides; i++) {
+                const angle = (2 * Math.PI / polySides) * i;
+                const x = d.x + d.r * Math.sin(angle);
+                const y = d.y + d.r * Math.cos(angle);
+                if (i === 0) overlayCtx.moveTo(x, y);
+                else overlayCtx.lineTo(x, y);
+            }
+            overlayCtx.closePath();
+        } else {
+            overlayCtx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
+        }
         overlayCtx.strokeStyle = "#ffa135";
         overlayCtx.lineWidth = 4 / transform.k;
         overlayCtx.stroke();
@@ -2287,7 +2530,7 @@ folderFilterOutButton.addEventListener("click", function () {
       // 2. Use Log2 scale. Newer items (smaller unit value) are lighter.
       linearBWColorScale1 = d3.scaleLog()
         .base(2)
-        .range(["#ebebeb", "#000000"])
+        .range(["#eee","#222"])
         .domain([1, Math.max(2, maxDays / divisor)]); // Domain in selected units
       
       minDateLabel.textContent = "Newest";
@@ -2295,7 +2538,7 @@ folderFilterOutButton.addEventListener("click", function () {
     } else {
       // Use linear scale for absolute time. Newer items (larger timestamp) are lighter.
       linearBWColorScale1 = d3.scaleLinear()
-        .range(["#000000", "#ebebeb"]);
+        .range(["#222", "#ebebeb"]);
         
       linearBWColorScale1.domain([minDate, maxDate]); // Use linear scale for absolute time
 
@@ -2356,7 +2599,7 @@ folderFilterOutButton.addEventListener("click", function () {
       } else if (colorMode === "depth") {
         return linearRainbowColorScale(d.depth);
       } else if (colorMode === "date") {
-        return dateValue ? linearBWColorScale1(dateValue) : "#888";
+        return dateValue ? linearBWColorScale1(dateValue) : "#fff";
       } else if (colorMode === "fileSize") {
         return exponentialColorScale(Math.max(1, d.value)); // Guard against 0 for log scale
       }
@@ -2371,7 +2614,7 @@ folderFilterOutButton.addEventListener("click", function () {
       } else if (colorMode === "depth") {
         return linearRainbowColorScale(d.depth);
       } else if (colorMode === "date") {
-        return dateValue ? linearBWColorScale1(dateValue) : "#ccc";
+        return dateValue ? linearBWColorScale1(dateValue) : "#fff";
       } else if (colorMode === "fileSize") {
         return exponentialColorScale(Math.max(1, d.value)); // Guard against 0 for log scale
       }
@@ -2406,7 +2649,7 @@ folderFilterOutButton.addEventListener("click", function () {
     }
   }
 
-  function zoomToNode(node) {
+  function zoomToNode(node, targetMaxVisibleDepth = null) {
     const width = canvas.width;
     const height = canvas.height;
     
@@ -2416,10 +2659,25 @@ folderFilterOutButton.addEventListener("click", function () {
     
     const newTransform = d3.zoomIdentity.translate(tx, ty).scale(k);
     
+    const startVisualDepth = visualZoomDepth;
+    const endVisualDepth = node.depth;
+    
     d3.transition().duration(750).tween("zoom", function () {
       const i = d3.interpolate(transform, newTransform);
+      const iVisualDepth = d3.interpolate(startVisualDepth, endVisualDepth);
+      updateBreadcrumbs();
+      let iDepth = null;
+      if (targetMaxVisibleDepth !== null) {
+          iDepth = d3.interpolate(maxVisibleDepthRelative, targetMaxVisibleDepth);
+      }
       return function (t) {
         transform = i(t);
+        visualZoomDepth = iVisualDepth(t);
+        if (iDepth) {
+            maxVisibleDepthRelative = iDepth(t);
+            depthVisibilitySlider.value = maxVisibleDepthRelative;
+            depthLabel.textContent = maxVisibleDepthRelative >= 5 ? "Deep" : maxVisibleDepthRelative.toFixed(1);
+        }
         isAnimating = true;  
             drawVisualization();
             drawHighlights();
@@ -2428,10 +2686,52 @@ folderFilterOutButton.addEventListener("click", function () {
         // VITAL: Update the D3 zoom state so panning starts from THIS position
         d3.select(canvas).property("__zoom", newTransform); 
         isAnimating = false;
-        updateBreadcrumbs();
+        visualZoomDepth = endVisualDepth;
+        if (targetMaxVisibleDepth !== null) {
+            // Ensure final value is set precisely
+            maxVisibleDepthRelative = targetMaxVisibleDepth;
+            depthVisibilitySlider.value = maxVisibleDepthRelative;
+            depthLabel.textContent = maxVisibleDepthRelative >= 5 ? "Deep" : maxVisibleDepthRelative.toFixed(1);
+        }
     });
     currentZoomNode = node;
 }
+
+  /**
+   * Animates the depth visibility from current to max and back to show off the data structure.
+   */
+  function animateDepthShowcase() {
+      if (maxVisibleDepthRelative >= 5) return;
+      const originalDepth = maxVisibleDepthRelative;
+      
+      d3.transition()
+          .duration(2500)
+          .ease(d3.easeQuadInOut)
+          .tween("depthShowcase", function() {
+              const i = d3.interpolate(originalDepth, 5);
+              return function(t) {
+                  const val = i(t);
+                  maxVisibleDepthRelative = val;
+                  depthVisibilitySlider.value = val;
+                  depthLabel.textContent = val >= 5 ? "Deep" : val.toFixed(1);
+                  drawVisualization();
+              };
+          })
+          .transition()
+          .duration(2500)
+          .ease(d3.easeQuadInOut)
+          .tween("depthReturn", function() {
+              const i = d3.interpolate(5, originalDepth);
+              return function(t) {
+                  const val = i(t);
+                  maxVisibleDepthRelative = val;
+                  depthVisibilitySlider.value = val;
+                  depthLabel.textContent = val >= 5 ? "Deep" : val.toFixed(1);
+                  drawVisualization();
+              };
+          });
+  }
+
   function resetZoom() {
     currentZoomNode = currentDataNodes[0];
     zoomToNode(currentZoomNode);
@@ -2466,8 +2766,8 @@ folderFilterOutButton.addEventListener("click", function () {
 
       if (i < pathNodes.length - 1) {
         const separator = document.createElement("span");
-        separator.textContent = "\\";
-        separator.className = "mx-1 text-gray-400";
+        separator.textContent = "\u203A"; // Segmented chevron like Explorer
+        separator.className = "breadcrumb-separator";
         breadcrumbsDiv.appendChild(separator);
       }
     });
@@ -2500,7 +2800,7 @@ folderFilterOutButton.addEventListener("click", function () {
           .size([containerWidth, containerHeight])
           .padding(d => {
               const ratio = d.data ? (d.data.folderFileRatio || 0) : 0;
-              const basePadding = Math.pow(parseFloat(paddingFactorslider.value) / 1200, 2);
+              const basePadding = Math.pow(parseFloat(paddingFactorslider.value) / 2000, 2);
               return basePadding / (1 + (ratio / 10));
           });
 
@@ -2662,31 +2962,35 @@ function exportCanvasAsPNG() {
 
   // Event listener for click on canvas
   canvas.addEventListener("click", function (event) {
-    const rect = canvas.getBoundingClientRect();
-    // Transform mouse coordinates based on current zoom
-    const mouseX = (event.clientX - rect.left - transform.x) / transform.k;
-    const mouseY = (event.clientY - rect.top - transform.y) / transform.k;
-
-    let clickedNode = null;
-    // Iterate through nodes in reverse order to detect smaller, top-most circles first
-    for (let i = currentDataNodes.length - 1; i >= 0; i--) {
-      const d = currentDataNodes[i];
-      const dx = mouseX - d.x;
-      const dy = mouseY - d.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance < d.r) {
-        window.selectedNode = d; // Store clicked node in global variable for access in other functions
-        clickedNode = d;
-        break;
-      }
-    }
-
+    const clickedNode = findNodeAt(event.clientX, event.clientY);
     if (clickedNode) {
-      selectedNode = clickedNode; // Update selected node for details panel
-      zoomToNode(clickedNode); // Zoom to the clicked node
+      window.selectedNode = clickedNode;
 
-      selectedNodeDetails(clickedNode); // Update details panel with selected node info
+      // Transition to full clarity: Adjust depth if clicking a hidden object
+      const zoomDepth = currentZoomNode ? currentZoomNode.depth : 0;
+      const clickedRelDepth = clickedNode.depth - zoomDepth;
+      let depthToPass = null;
+      if (maxVisibleDepthRelative < 10 && clickedRelDepth > maxVisibleDepthRelative) {
+          depthToPass = Math.ceil(clickedRelDepth);
+      }
+
+      // Handle Multi-select with Ctrl
+      if (event.ctrlKey) {
+          if (selectedNodes.has(clickedNode)) {
+              selectedNodes.delete(clickedNode);
+              if (selectedNode === clickedNode) selectedNode = Array.from(selectedNodes).pop() || null;
+          } else {
+              selectedNodes.add(clickedNode);
+              selectedNode = clickedNode;
+          }
+      } else {
+          selectedNodes.clear();
+          selectedNodes.add(clickedNode);
+          selectedNode = clickedNode;
+          zoomToNode(clickedNode, depthToPass); // Pass the target depth here
+      }
+
+      if (selectedNode) selectedNodeDetails(selectedNode);
 
       //Breadcrumbs or full path needs updating
       drawVisualization(); // Redraw to remove selection highlight
@@ -2696,10 +3000,9 @@ function exportCanvasAsPNG() {
       }
     } else {
       // If click occurred outside any node, clear selection and zoom out
-      //if (selectedNode) {
-        selectedNode = currentDataNodes[0]; // Reset to root node
+        selectedNodes.clear();
+        selectedNode = null;
         drawVisualization(); // Redraw to remove selection highlight
-      //}
         selectedItemDetails.classList.add("hidden");
         detailPath.textContent = "";
       copyPathButton.classList.add("hidden");
@@ -2713,8 +3016,15 @@ function exportCanvasAsPNG() {
       window.selectedNodeInTree(node);
     }
     selectedNode = node;
-    detailName.textContent = selectedNode.data.name;
-    detailType.textContent = selectedNode.data.type || "Folder";
+
+    if (selectedNodes.size > 1) {
+        detailName.textContent = `${selectedNodes.size} items selected`;
+        detailType.textContent = "Mixed Selection";
+        // Handle summary for multiple items if desired
+    } else {
+        detailName.textContent = selectedNode.data.name;
+        detailType.textContent = selectedNode.data.type || "Folder";
+    }
     
     document.getElementById("searchResultSummary").classList.add("hidden");
     // Display details in the third column

@@ -1,6 +1,7 @@
 #palette {
   --Orange: #317ced;
   --charcoal: #555655;
+  --NirclesBlue: #317ced; /* Defined for clarity, matches --Orange */
   --Silver: #a9aca9;
   --AshGrey: #bfc3ba;
   --dark: #3a3835;
@@ -236,7 +237,7 @@ input[type="range"] {
 /* Visualization Area */
 #visualizationColumn {
   grid-column: span 1 / span 1;
-  position: relative; /* For positioning toggle buttons */
+  position: relative;
 }
 
 .toggle-side-panel-btn {
@@ -256,18 +257,17 @@ input[type="range"] {
 
 /* Interaction Toggle */
 .interaction-toggle-container {
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 30;
-    display: flex;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 4px;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    /* display: flex; */
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px;
+    border-radius: 6px;
+    width: 100%;
+    /* justify-content: space-around; */
+    gap: 2px;
+    border: 1px solid #d1d5db;
 }
 .toggle-btn {
+    /* flex: 1; */
     padding: 4px 12px;
     border-radius: 6px;
     font-size: 14px;
@@ -277,7 +277,7 @@ input[type="range"] {
 }
 .toggle-btn.active {
     background: var(--dark);
-    color: white;
+    color: var(--Orange);
 }
 
 #toggleGraphBtn {
@@ -707,15 +707,55 @@ text {
   padding: 0px 20px;
 }
 .addressbar {
-  display: grid;
-  align-items: top;
-  height: 26px;
-  grid-template-columns: 1fr 100px; /*100px 200px; */
-  grid-gap: auto;
-  overflow-wrap: break-word;
-  align-items: top;
-  padding: 4px;
-  background-color: #fff;
+    display: flex;
+    align-items: center;
+    height: 32px;
+    background-color: #ffffff;
+    border: 1px solid #d1d5db;
+    margin: 4px 8px;
+    padding: 0 8px;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.address-bar-content {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.address-bar-content::-webkit-scrollbar {
+    display: none;
+}
+
+.address-root-icon {
+    margin-right: 8px;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.breadcrumb-item {
+    padding: 2px 6px;
+    border-radius: 2px;
+    color: var(--text-body);
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+    transition: background-color 0.1s;
+}
+
+.breadcrumb-item:hover {
+    background-color: #f3f4f6;
+    color: var(--NirclesBlue);
+}
+
+.breadcrumb-separator {
+    color: #9ca3af;
+    font-size: 12px;
+    user-select: none;
+    padding: 0 2px;
 }
 
 @media screen and (max-width: 600px) {
@@ -822,4 +862,73 @@ text {
     stroke: #000;
     stroke-opacity: 0.4;
     stroke-width: 5px;
+}
+
+/* Depth Slider Styles */
+.depth-control-panel {
+    padding: 12px;
+    background-color: rgba(15, 15, 15, 0.05);
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    text-align: left;
+}
+
+.control-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-top: 10px;
+}
+
+.slider-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    position: relative;
+}
+
+.depth-slider {
+    writing-mode: vertical-lr;
+    direction: ltr;
+    vertical-align: middle;
+    width: 12px;
+    height: 120px;
+    cursor: pointer;
+    accent-color: var(--NirclesBlue);
+}
+
+.depth-slider-labels {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 120px;
+    font-size: 9px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+}
+
+.depth-value-readout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: var(--NirclesBlue);
+    font-weight: bold;
+    font-size: 10px;
+}
+
+.mode-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    max-width: 115px;
+}
+
+.small-select {
+    font-size: 11px !important;
+    padding: 4px !important;
+    width: 100% !important;
+    background: white;
+    cursor: pointer;
 }
