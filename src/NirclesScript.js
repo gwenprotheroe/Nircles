@@ -22,6 +22,12 @@ document.addEventListener("DOMContentLoaded", function () {
   const detailSize = document.getElementById("detailSize");
   const detailLastModified = document.getElementById("detailLastModified");
   const detailPath = document.getElementById("detailPath");
+  const itemContextActions = document.getElementById("itemContextActions");
+  const contextMenu = document.getElementById("contextMenu");
+  const ctxRename = document.getElementById("ctxRename");
+  const ctxNewFolder = document.getElementById("ctxNewFolder");
+  const ctxDelete = document.getElementById("ctxDelete");
+
   const searchItems = document.getElementById("searchItems");
   const initialSearchPrompt = document.getElementById("initialSearchPrompt");
   
@@ -29,6 +35,11 @@ document.addEventListener("DOMContentLoaded", function () {
   const jsonFileLoad = document.getElementById("jsonFileLoad");
   const loadJsonFileButton = document.getElementById("loadJsonFileButton");
   const saveScanButton = document.getElementById("saveScanButton");
+  const newFolderButton = document.getElementById("newFolderButton");
+  const closeAppButton = document.getElementById("closeApp");
+  const panModeBtn = document.getElementById("panModeBtn");
+  const orgModeBtn = document.getElementById("orgModeBtn");
+  const orgMenu = document.querySelector(".orgMenu");
   const zoomOutButton = document.getElementById("zoomOutButton");
   const exportPngButton = document.getElementById("exportPngButton");
   const exportSvgButton = document.getElementById("exportSvgButton");
@@ -36,6 +47,8 @@ document.addEventListener("DOMContentLoaded", function () {
   const folderFilterButton = document.getElementById("folderFilterButton");
   const folderFilterOutButton = document.getElementById("folderFilterOutButton");
   const folderSpecificActions = document.getElementById("folderSpecificActions");
+  const emptyFolderSelectButton = document.getElementById("emptyFolderSelectButton");
+  const deleteMatchButton = document.getElementById("deleteMatchButton");
   const filterOutButton = document.getElementById("filterOutButton");
   const copyPathButton = document.getElementById('copyPathButton');
   const showAboutPageButton = document.getElementById("showAboutPageButton");
@@ -47,8 +60,16 @@ document.addEventListener("DOMContentLoaded", function () {
   const scanSettingsButton = document.getElementById("scanSettingsButton");
   const resetButton = document.getElementById("resetButton");
   const resetButton2 = document.getElementById("resetButton2");
-  let originalFullData = null; // To store the state for Reset
 
+  const changesMadeContainer = document.getElementById("changesMadeContainer");
+  const changesList = document.getElementById("changesList");
+  const applyChangesBtn = document.getElementById("applyChangesBtn");
+  const revertChangesBtn = document.getElementById("revertChangesBtn");
+
+  let originalFullData = null; // To store the state for Reset
+  let immutableRawData = null; // VITAL: The true backup for Revert All
+
+  window.topFileTypes = []; // Track top 10 extensions globally
   const colorBySelect = document.getElementById("colorBy"); // Single color selection dropdown
   const relativeDate = document.getElementById("relativeDate");
   const minDateLabel = document.getElementById("minDateLabel");
@@ -82,6 +103,11 @@ document.addEventListener("DOMContentLoaded", function () {
   let selectedNode = window.selectedNode ||null; // Track the node currently selected by click for details panel
   let searchResults = []; // Shared search results state
   let currentZoomNode = window.currentZoomNode ||null; // Track the node currently zoomed into
+    let isOrganizeMode = false;
+    let draggedNode = null; // Track the node currently being dragged
+    let isMovingSearchSet = false; // Track if we are moving multiple items via search
+    let pendingChanges = [];
+    let hasUnsavedChanges = false;
     let filtered = false;   
     let filterString = "";
   let activeFilters = [];
@@ -127,8 +153,7 @@ document.addEventListener("DOMContentLoaded", function () {
     "#F4B5B5", //shades of himalayan salt pink - oh get lost branding people.
   ]);
   const exponentialColorScale = d3
-    .scalePow()
-    .exponent(0.5)
+    .scaleLog()
     .range(["#030302", "#F2EFEC"]);
   // const linearRainbowColorScale = d3.scaleLinear().range(['#FBE0D6','#B24D25']); //Shades of orange
   const linearRainbowColorScale = d3
@@ -148,9 +173,11 @@ document.addEventListener("DOMContentLoaded", function () {
   window.linearRainbowColorScale = linearRainbowColorScale;
   window.linearBWColorScale1 = linearBWColorScale1;
   window.drawVisualization = drawVisualization;
+  window.drawHighlights = drawHighlights;
   window.currentFilterFunction = null;
   window.folderRatioColorScale = folderRatioColorScale; // Expose for potential legend
   window.currentFilterDescription = null;
+  window.formatAge = formatAge; // Expose for use in Interaction Graphs
 
  // Dummy Data
   const defaultData = {
@@ -159,6 +186,13 @@ document.addEventListener("DOMContentLoaded", function () {
     type: "folder",
     value: "0",
     children: [
+      {
+        path: "C:\\Demo\\Empty Staging",
+        name: "Empty Staging",
+        type: "folder",
+        value: "1000",
+        children: []
+      },
       {
         path: "C:\\Demo\\Files and Folders",
         name: "Files and Folders",
@@ -338,7 +372,7 @@ document.addEventListener("DOMContentLoaded", function () {
               {
                 path: "C:\\Demo\\See All\\Project 3",
                 name: "Folder Summary.ncl",
-                type: "txt",
+                type: "ncl",
                 value: 105486,
                 last_modified_unix: 1754352061.709732,
                 last_modified_iso: "2025-08-05T01:01:01.709732",
@@ -444,6 +478,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // Initial load with dummy data
   rootNodeData = defaultData;
   window.originalFullData = JSON.parse(JSON.stringify(rootNodeData));
+  window.immutableRawData = JSON.parse(JSON.stringify(rootNodeData));
   processAndRenderVisualization(rootNodeData);
   // zoomToNode(rootNodeData);
   updateBreadcrumbs();
@@ -452,6 +487,11 @@ document.addEventListener("DOMContentLoaded", function () {
   const zoom = d3
     .zoom()
     .scaleExtent([0.005, 1000]) 
+    .filter(event => {
+        // Disable zoom/pan behavior entirely when in Organize mode
+        // This allows the drag behavior to receive the events instead
+        return !isOrganizeMode && !event.button;
+    })
     .on("zoom", (event) => {
       isAnimating = true;
       transform = event.transform;
@@ -467,6 +507,140 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Apply zoom behavior to the canvas
   d3.select(canvas).call(zoom);
+
+  // Helper to get current search/filter state
+  const getMatchesSearch = () => {
+      const term = searchTerm.toLowerCase();
+      const hasGraphFilter = window.currentFilterFunction !== null;
+      if (term.length < 2 && !hasGraphFilter) return null;
+
+      return (d) => {
+          const nameMatch = term.length < 2 || (d.data && d.data.name.toLowerCase().includes(term));
+          const graphMatch = !window.currentFilterFunction || window.currentFilterFunction(d.data || d, d.depth);
+          return nameMatch && graphMatch;
+      };
+  };
+
+  // Drag behavior for Organisation
+  const drag = d3.drag()
+    .on("start", (event) => {
+        if (!isOrganizeMode) return;
+        const node = findNodeAt(event.x, event.y);
+        if (node) {
+            event.subject.node = node;
+            canvas.style.cursor = "grabbing";
+            draggedNode = node; // Store the dragged node
+            // Store original position in data space
+            draggedNode.originalX = node.x;
+            draggedNode.originalY = node.y;
+            // Initialize current position in data space
+            draggedNode.currentX = draggedNode.originalX;
+            draggedNode.currentY = draggedNode.originalY;
+
+            // Determine if we are moving the whole search set
+            const isMatch = getMatchesSearch();
+            isMovingSearchSet = isMatch && isMatch(node);
+
+            drawHighlights(); // Draw the ghost immediately
+        }
+    })
+    .on("drag", (event) => {
+        if (!isOrganizeMode || !event.subject.node) return;
+        // Update current position in data space
+        draggedNode.currentX = (event.x - transform.x) / transform.k;
+        draggedNode.currentY = (event.y - transform.y) / transform.k;
+
+        // Detect if we are hovering over a potential target folder during the drag
+        hoveredNode = findNodeAt(event.x, event.y);
+
+        drawHighlights(); // Redraw ghost and line
+    })
+    .on("end", (event) => {
+        if (!isOrganizeMode || !event.subject.node) return;
+        canvas.style.cursor = "grab";
+        const targetNode = findNodeAt(event.x, event.y);
+        const sourceNode = event.subject.node;
+
+        if (targetNode && targetNode !== sourceNode && isaFolder(targetNode)) {
+            // Sync changes to Master Data to preserve across filter resets
+            const sourceMaster = findInMaster(sourceNode.data);
+            const sourceParentMaster = sourceNode.parent ? findInMaster(sourceNode.parent.data) : null;
+            const targetMaster = findInMaster(targetNode.data);
+            
+            if (sourceMaster && sourceParentMaster && targetMaster) {
+                if (isMovingSearchSet) {
+                const isMatch = getMatchesSearch();
+                const results = currentDataNodes.filter(isMatch);
+                
+                const topLevelResults = results.filter(n => {
+                    let p = n.parent;
+                    while(p) {
+                        if (results.includes(p)) return false;
+                        p = p.parent;
+                    }
+                    return true;
+                });
+
+                topLevelResults.forEach(node => {
+                    const sMaster = findInMaster(node.data);
+                    const pMaster = node.parent ? findInMaster(node.parent.data) : null;
+                    if (sMaster && pMaster) {
+                        pMaster.children = pMaster.children.filter(c => c !== sMaster);
+                        if (!targetMaster.children) targetMaster.children = [];
+                        
+                        // Automatic Resolution
+                        const originalName = sMaster.name;
+                        sMaster.name = resolveNameClash(originalName, targetMaster);
+
+                        // Update paths for moved items
+                        updatePathAfterMove(sMaster, targetMaster);
+                        
+                        targetMaster.children.push(sMaster);
+                    }
+                });
+
+                window.addPendingChange('move', `Moved ${topLevelResults.length} search results to ${targetMaster.name}`);
+            } else {
+                sourceParentMaster.children = sourceParentMaster.children.filter(c => c !== sourceMaster);
+                if (!targetMaster.children) targetMaster.children = [];
+                
+                // Automatic Resolution
+                const originalName = sourceMaster.name;
+                sourceMaster.name = resolveNameClash(originalName, targetMaster);
+
+                updatePathAfterMove(sourceMaster, targetMaster);
+                
+                targetMaster.children.push(sourceMaster);
+                window.addPendingChange('move', `${sourceMaster.name} moved to ${targetMaster.name}${sourceMaster.name !== originalName ? ' (Auto-renamed)' : ''}`);
+            }
+            
+            applyFilters(); // Refresh view from updated Master Data
+            }
+        }
+        event.subject.node = null;
+        draggedNode = null; // Clear dragged node
+        isMovingSearchSet = false;
+        drawHighlights(); // Clear ghost and line
+    });
+
+  d3.select(canvas).call(drag);
+
+  function findNodeAt(rawX, rawY) {
+      const rect = canvas.getBoundingClientRect();
+      // Transform screen coordinates to visualization coordinates
+      const x = (rawX - transform.x) / transform.k;
+      const y = (rawY - transform.y) / transform.k;
+
+      for (let i = currentDataNodes.length - 1; i >= 0; i--) {
+          const d = currentDataNodes[i];
+          const dx = x - d.x;
+          const dy = y - d.y;
+          if (Math.sqrt(dx * dx + dy * dy) < d.r) {
+              return d;
+          }
+      }
+      return null;
+  }
 
 
     function filterHierarchy(node, matchesSearch, depth = 0) {
@@ -602,6 +776,30 @@ document.addEventListener("DOMContentLoaded", function () {
     jsonFileLoad.click(); // Trigger the hidden file input click
       });
 
+  // Event listener for Save Scan button
+  saveScanButton.addEventListener("click", function () {
+    if (!rootNodeData) {
+      displayMessageBox("No data available to save.", "Warning");
+      return;
+    }
+
+    // Export the current rootNodeData (which has filters applied) as a JSON file
+    const dataStr = JSON.stringify(rootNodeData, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    const dateStr = new Date().toISOString().split('T')[0];
+    const fileName = `${rootNodeData.name}-${dateStr}`.replace(/[^a-z0-9 _-]/gi, '-');
+
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  });
+
   // Event listener for when a file is selected via the input
   jsonFileLoad.addEventListener("change", function (event) {
       resetZoom(); // Reset zoom to fit the new data
@@ -609,22 +807,13 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!file) {
       return; // No file selected
     }
-
-    saveScanButton.addEventListener("click", function () {
-      // placeholder for save functionality - currently just saves the original data loaded.
-     
-      // Export the data as a JSON file
-      displayMessageBox("Save functionality coming soon! For now, this button will download the original data loaded.", "Info");
-    });
-
-
     const reader = new FileReader();
     reader.onload = function (e) {
       try {
-        window.rootNodeData = JSON.parse(e.target.result); // Store original root data
-        rootNodeData = JSON.parse(e.target.result); // Set current root data
+        window.immutableRawData = JSON.parse(e.target.result); // The fresh load
+        window.originalFullData = JSON.parse(JSON.stringify(window.immutableRawData)); // Master Architecture
+        rootNodeData = JSON.parse(JSON.stringify(window.immutableRawData)); // Initial view
         processAndRenderVisualization(rootNodeData);
-        window.originalFullData = JSON.parse(JSON.stringify(rootNodeData)); // Update the reset function
         searchInput.value = ""; // Clear search on new load
         searchTerm = "";
         folderSummary.value = ""; //Clear summary
@@ -648,6 +837,305 @@ document.addEventListener("DOMContentLoaded", function () {
     };
     reader.readAsText(file); // Read the file content as text
 });
+  
+  // Changes Management Logic
+  window.addPendingChange = function(type, description) {
+      pendingChanges.push({ type, description, timestamp: Date.now() });
+      hasUnsavedChanges = true;
+      renderChanges();
+  };
+
+  function renderChanges() {
+      changesList.innerHTML = "";
+      if (pendingChanges.length === 0) {
+          changesMadeContainer.classList.add("hidden");
+          return;
+      }
+
+      changesMadeContainer.classList.remove("hidden");
+      pendingChanges.forEach((change, index) => {
+          const item = document.createElement("div");
+          item.className = "change-item";
+          item.innerHTML = `
+              <span>${change.description}</span>
+              <span class="remove-filter" onclick="removePendingChange(${index})" title="Undo this change">×</span>
+          `;
+          changesList.appendChild(item);
+      });
+  }
+
+  window.removePendingChange = function(index) {
+      pendingChanges.splice(index, 1);
+      if (pendingChanges.length === 0) hasUnsavedChanges = false;
+      renderChanges();
+  };
+
+  applyChangesBtn.addEventListener("click", () => {
+      displayMessageBox(
+          "Applying changes to the physical file system is a <strong>Nircles Pro</strong> feature. <br><br> In this demo, changes are only recorded in the local summary.",
+          "Feature Restricted"
+      );
+  });
+
+  revertChangesBtn.addEventListener("click", () => {
+      displayConfirmationBox("Are you sure you want to discard all pending organization changes?", () => {
+          pendingChanges = [];
+          hasUnsavedChanges = false;
+          renderChanges();
+          
+          // 1. Restore Master Architecture from the immutable backup
+          window.originalFullData = JSON.parse(JSON.stringify(window.immutableRawData));
+
+          // 2. Re-apply current filters to the restored data
+          applyFilters();
+          resetZoom();
+      });
+  });
+
+  // Event listener for Close button
+  closeAppButton.addEventListener("click", function () {
+    if (hasUnsavedChanges) {
+      displayConfirmationBox(
+        "You have unsaved changes (filters/edits). Are you sure you want to close?",
+        () => { window.close(); }
+      );
+    } else {
+      window.close();
+    }
+  });
+
+  function displayConfirmationBox(message, onConfirm) {
+    const messageBox = document.createElement("div");
+    messageBox.className = `message-box-overlay`;
+    messageBox.innerHTML = `
+        <div class="message-box-content">
+            <h3 class="text-info">Confirm Action</h3>
+            <p>${message}</p>
+            <div style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
+                <button id="confirmActionBtn">Yes</button>
+                <button id="cancelActionBtn" style="background-color: var(--AshGrey);">No</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(messageBox);
+    document.getElementById("confirmActionBtn").onclick = () => { document.body.removeChild(messageBox); onConfirm(); };
+    document.getElementById("cancelActionBtn").onclick = () => { document.body.removeChild(messageBox); };
+  }
+
+  // Reusable Folder Creation Logic
+  window.triggerNewFolder = function(targetNode) {
+      const folderName = prompt("Enter new folder name:", "New Folder");
+      if (!folderName) return;
+
+      const targetParentNode = (targetNode && isaFolder(targetNode)) ? targetNode : currentZoomNode || currentDataNodes[0];
+      const masterParent = findInMaster(targetParentNode.data);
+
+      if (masterParent) {
+          if (!masterParent.children) masterParent.children = [];
+          const newFolderValue = Math.max(1000, masterParent.value * 0.2); // 20% of parent's effective value or 1000 bytes
+
+          // Resolve clash for default name
+          const uniqueName = resolveNameClash(folderName, masterParent);
+
+          const newFolder = { // Assign the calculated value directly to the new folder's data
+          name: uniqueName,
+          path: masterParent.path + "\\" + masterParent.name,
+          type: "folder",
+          value: newFolderValue, // Use the calculated minimum value
+          children: [],
+          creationTime: Date.now() // Tag for visual highlighting
+          };
+
+          masterParent.children.push(newFolder);
+
+          window.addPendingChange('create', `Created folder "${uniqueName}" in ${masterParent.name}`);
+          applyFilters(); // Refresh view
+      startPulseLoop(); // Trigger the animation loop
+      }
+  };
+
+  newFolderButton.addEventListener("click", () => window.triggerNewFolder(selectedNode));
+
+  // Interaction Toggle Logic
+  panModeBtn.addEventListener("click", () => setInteractionMode(false));
+  orgModeBtn.addEventListener("click", () => setInteractionMode(true));
+
+  function setInteractionMode(organize) {
+    isOrganizeMode = organize;
+    panModeBtn.classList.toggle("active", !organize);
+    orgModeBtn.classList.toggle("active", organize);
+    canvas.style.cursor = organize ? "grab" : "crosshair";
+  }
+
+  // Reusable Rename Logic
+  window.triggerRename = function(node) {
+      if (!node) return;
+      const masterNode = findInMaster(node.data);
+      const masterParent = node.parent ? findInMaster(node.parent.data) : null;
+      
+      if (!masterNode) return;
+      
+      const oldName = masterNode.name;
+      const newName = prompt(`Rename "${oldName}" to:`, oldName);
+      if (!newName || newName === oldName) return;
+
+      // Automatic resolution if user enters a name that exists
+      const resolvedName = resolveNameClash(newName, masterParent, masterNode);
+
+      const oldPath = masterNode.path;
+      masterNode.name = resolvedName;
+      if (masterNode.type === 'folder') {
+          updateDescendantPaths(masterNode, oldPath + "\\" + oldName, oldPath + "\\" + newName);
+      }
+
+      window.addPendingChange('rename', `Renamed "${oldName}" to "${resolvedName}"`);
+      applyFilters();
+  };
+
+  renameButton.addEventListener("click", () => window.triggerRename(selectedNode));
+
+  // Reusable Delete Logic
+  window.triggerDelete = function(node) {
+      if (!node || !node.parent) return;
+      displayConfirmationBox(`Are you sure you want to delete "${node.data.name}"?`, () => {
+          const masterParent = findInMaster(node.parent.data);
+          const masterNode = findInMaster(node.data);
+          
+          if (masterParent && masterNode) {
+              masterParent.children = masterParent.children.filter(c => c !== masterNode);
+          window.addPendingChange('delete', `Deleted "${node.data.name}"`);
+              applyFilters();
+          selectedNode = null;
+          selectedItemDetails.classList.add("hidden");
+          initialDetailsPrompt.classList.remove("hidden");
+          }
+      });
+  };
+
+  // Logic to delete all currently matched items (Search or Empty Folder selection)
+  window.triggerDeleteResults = function() {
+      const isMatch = getMatchesSearch();
+      if (!isMatch) return;
+      
+      const results = currentDataNodes.filter(isMatch);
+      if (results.length === 0) return;
+
+      displayConfirmationBox(`Are you sure you want to delete all ${results.length} matched items?`, () => {
+          // Filter to only top-level nodes in the selection to avoid errors when deleting children recursively
+          const topLevelResults = results.filter(n => {
+              let p = n.parent;
+              while(p) {
+                  if (results.includes(p)) return false;
+                  p = p.parent;
+              }
+              return true;
+          });
+
+          topLevelResults.forEach(node => {
+              const masterNode = findInMaster(node.data);
+              const masterParent = node.parent ? findInMaster(node.parent.data) : null;
+              if (masterNode && masterParent) {
+                  masterParent.children = masterParent.children.filter(c => c !== masterNode);
+              }
+          });
+
+          window.addPendingChange('delete', `Deleted ${topLevelResults.length} items from results`);
+          resetButton.click(); // Reset highlights and refresh view
+      });
+  };
+
+  // Context Menu Event Handlers
+  let contextTargetNode = null;
+  canvas.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      contextTargetNode = findNodeAt(e.clientX, e.clientY);
+      if (contextTargetNode) {
+          contextMenu.style.left = `${e.pageX}px`;
+          contextMenu.style.top = `${e.pageY}px`;
+          contextMenu.classList.remove("hidden");
+          // Only show "New Folder" if target is a folder
+          ctxNewFolder.style.display = isaFolder(contextTargetNode) ? "block" : "none";
+      }
+  });
+
+  // Hide context menu on global click
+  window.addEventListener("mousedown", (e) => {
+      if (!contextMenu.contains(e.target)) {
+          contextMenu.classList.add("hidden");
+      }
+  });
+
+  ctxRename.onclick = () => { window.triggerRename(contextTargetNode); contextMenu.classList.add("hidden"); };
+  ctxNewFolder.onclick = () => { window.triggerNewFolder(contextTargetNode); contextMenu.classList.add("hidden"); };
+  ctxDelete.onclick = () => { window.triggerDelete(contextTargetNode); contextMenu.classList.add("hidden"); };
+
+  // Master Data Sync Helpers
+  function resolveNameClash(name, parentData, excludeNode = null) {
+      if (!parentData || !parentData.children) return name;
+      
+      let finalName = name;
+      let counter = 1;
+      
+      // Determine if there's an extension to preserve during suffixing (e.g. file.txt -> file (2).txt)
+      const lastDotIndex = name.lastIndexOf(".");
+      const hasExtension = lastDotIndex > 0 && (name.length - lastDotIndex) <= 6; 
+      const baseName = hasExtension ? name.substring(0, lastDotIndex) : name;
+      const extension = hasExtension ? name.substring(lastDotIndex) : "";
+
+      // Helper to check if name exists in siblings
+      const checkClash = (n) => parentData.children.some(child => 
+          child !== excludeNode && child.name.toLowerCase() === n.toLowerCase()
+      );
+
+      while (checkClash(finalName)) {
+          counter++;
+          finalName = `${baseName} (${counter})${extension}`;
+      }
+      
+      return finalName;
+  }
+
+  function findInMaster(nodeData, root = window.originalFullData) {
+      if (root.path === nodeData.path && root.name === nodeData.name) return root;
+      if (root.children) {
+          for (const child of root.children) {
+              const found = findInMaster(nodeData, child);
+              if (found) return found;
+          }
+      }
+      return null;
+  }
+
+  function updatePathAfterMove(node, newParentMaster) {
+      const oldFullPath = node.path + "\\" + node.name;
+      const newParentPath = newParentMaster.path + "\\" + newParentMaster.name;
+
+      if (node.type === 'folder' || node.type === 'Folder') {
+          node.path = newParentPath;
+          const newFullPath = node.path + "\\" + node.name;
+
+          // Recursively update children
+          if (node.children) {
+              updateDescendantPaths(node, oldFullPath, newFullPath);
+          }
+      } else {
+          // For files, path is just the parent directory
+          node.path = newParentPath;
+      }
+  }
+
+  function updateDescendantPaths(data, oldParentPath, newParentPath) {
+      if (data.children) {
+          data.children.forEach(child => {
+              if (child.path && child.path.startsWith(oldParentPath)) {
+                  child.path = newParentPath + child.path.substring(oldParentPath.length);
+              }
+              if (child.children) {
+                  updateDescendantPaths(child, oldParentPath, newParentPath);
+              }
+          });
+      }
+  }
 
   // Event listener for color selection change (single dropdown)
   colorBySelect.addEventListener("change", function () {
@@ -808,6 +1296,25 @@ drawVisualization(); // Redraw to apply search highlighting
     window.currentFilterDescription = null;
    });
   
+
+  // Event listener for selecting Empty Folders (highlighting them as a selection set)
+  emptyFolderSelectButton.addEventListener("click", function () {
+      // Use the Graph Filter mechanism so they appear as a "Search Set" without pruning the view
+      window.currentFilterFunction = (data) => {
+          const isFolder = data.type === "folder" || data.type === "Folder" || data.type === "Directory" || data.type === "directory";
+          const isEmpty = !data.children || data.children.length === 0;
+          return isFolder && isEmpty;
+      };
+      window.currentFilterDescription = "Empty Folders";
+      
+      // Clear text search to focus purely on the empty folder set
+      searchTerm = "";
+      searchInput.value = "";
+      
+      drawVisualization(); 
+  });
+
+
   filterOutButton.addEventListener("click", function () {
     const hasGraphFilter = window.currentFilterFunction !== null;
     if (searchTerm.length < 2 && !hasGraphFilter) {
@@ -894,6 +1401,7 @@ viewSettings.addEventListener("click", function () {
   resetButton.addEventListener("click", function () {
     activeFilters = [];
     applyFilters();
+    hasUnsavedChanges = false;
     resetButton.classList.add("hidden");
     resetButton2.classList.add("hidden");
     searchTerm = "";
@@ -1020,6 +1528,19 @@ folderFilterOutButton.addEventListener("click", function () {
     link.click();
   }
 
+  // Helper to keep the canvas rendering during the 3-second pulse period
+  function startPulseLoop() {
+    if (window.pulseTimer) window.pulseTimer.stop();
+    window.pulseTimer = d3.timer((elapsed) => {
+      drawVisualization();
+      if (elapsed > 3000) {
+        window.pulseTimer.stop();
+        window.pulseTimer = null;
+        drawVisualization(); // Final draw to clear pulse
+      }
+    });
+  }
+
   function initiateVisuals(data) {
     InteractionGraphs(data);
     createFolderTree(data, '#folder-tree-container');
@@ -1055,27 +1576,42 @@ folderFilterOutButton.addEventListener("click", function () {
     
     const root = d3
     .hierarchy(data)
-    .sum((d) => Math.pow(d.value, ignoreSize.value / 100)) //ignoreSize.checked ?  (d.value / d.value) : +d.value)
+    .sum((d) => {
+        const val = parseFloat(d.value) || 0;
+        // Ensure empty folders have a minimum weight so they are rendered as circles.
+        if (d.parent && (d.type === "folder" || d.type === "Folder") && (!d.children || d.children.length === 0) && val === 0) {
+          var minNewSize = Math.max(1000, d.parent.value * 0.2); // 20% of parent's effective value or 1000 bytes
+            return minNewSize; 
+        }
+        return Math.pow(val, ignoreSize.value / 100);
+    })
     .sort((a, b) => sortItOut(a, b));
     
-    const pack = d3
-    .pack()
-    .size([containerWidth, containerHeight])
-    .padding(Math.pow(paddingFactorslider.value / 1200, 2)); //Original value 0.3
-    
-    currentDataNodes = pack(root).descendants();
-    const targetNodes = pack(root).descendants();
-
-    // Update zoom target immediately to the new root so resetZoom works correctly
-    currentZoomNode = currentDataNodes[0];
-    window.currentZoomNode = currentZoomNode;
-
-    // Calculate folder ratios after packing
-    currentDataNodes.forEach(d => {
+    // Calculate folder ratios BEFORE packing so padding can use the values
+    root.descendants().forEach(d => {
         if (isaFolder(d)) {
             d.data.folderFileRatio = calculateFolderRatio(d);
         }
     });
+
+    const pack = d3.pack()
+        .size([containerWidth, containerHeight])
+        .padding(d => {
+            const ratio = d.data ? (d.data.folderFileRatio || 0) : 0;
+            const basePadding = Math.pow(parseFloat(paddingFactorslider.value) / 1200, 2);
+            // Inversely proportional: High density folders get thinner borders
+            return basePadding / (1 + (ratio / 7));
+        });
+
+    const targetNodes = pack(root).descendants();
+
+    // VITAL: Update currentDataNodes BEFORE calling setColorDomains 
+    // so folder colors are calculated based on the new structure immediately.
+    currentDataNodes = targetNodes;
+
+    // Update zoom target immediately to the new root so resetZoom works correctly
+    currentZoomNode = targetNodes[0];
+    window.currentZoomNode = currentZoomNode;
 
     setColorDomains(); 
     initiateVisuals(data);
@@ -1115,7 +1651,6 @@ folderFilterOutButton.addEventListener("click", function () {
       });
 
       // Update the global reference and draw
-      currentDataNodes = targetNodes;
       currentZoomNode = currentDataNodes[0];
       window.currentZoomNode = currentZoomNode; // Ensure global reference is updated during animation
       drawVisualization();
@@ -1143,27 +1678,33 @@ folderFilterOutButton.addEventListener("click", function () {
     }
   }
 
-  // New helper function to calculate folder ratio
+  /**
+   * Calculates the ratio of files to folders for immediate children only.
+   * Provides a "local" density metric for the current directory level.
+   */
   function calculateFolderRatio(node) {
-      let numFiles = 0;
-      let numFolders = 0;
+      let numAllFiles = 0;
+      let numAllFolders = 0;
 
       // Iterate over all descendants (including itself, but we only care about children for ratio)
       node.descendants().forEach(d => {
           if (d === node) return; // Exclude the node itself
 
           if (isaFolder(d)) {
-              numFolders++;
+              numAllFolders++;
           } else {
-              numFiles++;
+              numAllFiles++;
           }
       });
 
       // If there are no sub-folders, the "ratio" is effectively the file count.
       // This prevents Infinity and provides a meaningful density metric.
-      if (numFolders === 0) return numFiles;
-      return numFiles / numFolders;
+      if (numAllFolders === 0) return numAllFiles;
+      if (numAllFiles === 0) return numAllFolders; // If there are no files, return the folder count to reflect density of folders
+      let ratio = numAllFiles / numAllFolders; 
+      return ratio; // Add the folder count
   }
+
   function applyCurrentZoom() {
     // Apply current zoom transform
     ctx.save();
@@ -1186,11 +1727,22 @@ folderFilterOutButton.addEventListener("click", function () {
       });
     }
 
-    html += `<div class="small-text">Total size: ${formatBytes(currentDataNodes[0].value)}</div>`;
+    html += `<div class="small-text">Total size: ${formatBytes(currentDataNodes[0].value || 0)}</div>`;
     folderSummary.innerHTML = html;
   }
-  function searchHelper(d) {
-    
+
+  /**
+   * Check if a node is currently within the visible canvas bounds.
+   * Used to skip drawing calculations for off-screen elements.
+   */
+  function isInViewport(d) {
+    const viewLeft = -transform.x / transform.k;
+    const viewRight = (canvas.width - transform.x) / transform.k;
+    const viewTop = -transform.y / transform.k;
+    const viewBottom = (canvas.height - transform.y) / transform.k;
+
+    return d.x + d.r > viewLeft && d.x - d.r < viewRight &&
+           d.y + d.r > viewTop && d.y - d.r < viewBottom;
   }
 
   // Function to draw all circles and text on the canvas
@@ -1231,11 +1783,14 @@ folderFilterOutButton.addEventListener("click", function () {
       searchLogic(matchesSearch);
       filterButton.classList.remove("hidden");
       filterOutButton.classList.remove("hidden");
+      deleteMatchButton.classList.remove("hidden");
       searchSummary.classList.remove("hidden");
     } else {
       searchSummary.classList.remove("hidden");
       filterButton.classList.add("hidden");
       filterOutButton.classList.add("hidden");
+      deleteMatchButton.classList.add("hidden");
+      searchResults = "";
       searchResults = [];
       searchCount.textContent = "";
       searchSum.textContent = "";
@@ -1249,12 +1804,7 @@ folderFilterOutButton.addEventListener("click", function () {
       .filter((d) => isaFolder(d))
       .sort((a, b) => b.r - a.r);
     directories.forEach((d) => {
-      if ( // Check if the node is within the current viewport before drawing
-        d.x - d.r < (canvas.width - transform.x) / transform.k &&
-        d.x + d.r > (0 - transform.x) / transform.k &&
-        d.y - d.r < (canvas.height - transform.y) / transform.k &&
-        d.y + d.r > (0 - transform.y) / transform.k
-      ) {
+      if (isInViewport(d)) {
         if ( // Only draw if it's above the minimum radius threshold or matches the search term
           d.r * transform.k > minRadius ||
           (isFiltering && matchesSearch(d))
@@ -1266,7 +1816,12 @@ folderFilterOutButton.addEventListener("click", function () {
           // Highlight for hover, selection, zoom, or search match
           // Use white strokes for the "Ratio" scheme (to contrast with black folders)
           // Use black strokes for all other schemes (to contrast with colorful/white folders)
-          let strokeColor = colorMode === "ratio" ? "#ffffff" : "#000000";
+          let strokeColor = "#000000";
+          if (colorMode === "ratio") {
+            strokeColor = "#ffffff";
+          } else if (colorMode === "fileSize") {
+            strokeColor = linearRainbowColorScale(d.depth);
+          }
           let lineWidth = 0.5 / transform.k;
 
           if (d === selectedNode ||
@@ -1290,6 +1845,19 @@ folderFilterOutButton.addEventListener("click", function () {
           }
           ctx.fill();
           ctx.stroke();
+
+          // --- NEW FOLDER PULSE EFFECT ---
+          if (d.data.creationTime && Date.now() - d.data.creationTime < 3000) {
+            const age = Date.now() - d.data.creationTime;
+            const opacity = 1 - (age / 3000); // Fade out over time
+            const pulseRadius = Math.sin(age / 150) * 8 + 8; // Pulsating range
+            
+            ctx.beginPath();
+            ctx.arc(d.x, d.y, d.r + (pulseRadius / transform.k), 0, 2 * Math.PI);
+            ctx.strokeStyle = `rgba(49, 124, 237, ${opacity})`; // Nircles Blue highlight
+            ctx.lineWidth = 4 / transform.k;
+            ctx.stroke();
+          }
         }
       }
     });
@@ -1300,12 +1868,7 @@ folderFilterOutButton.addEventListener("click", function () {
 
     const files = currentDataNodes.filter((d) => !isaFolder(d));
     files.forEach((d) => {
-      if (
-        d.x - d.r < (canvas.width - transform.x) / transform.k &&
-        d.x + d.r > (0 - transform.x) / transform.k &&
-        d.y - d.r < (canvas.height - transform.y) / transform.k &&
-        d.y + d.r > (0 - transform.y) / transform.k
-      ) {
+      if (isInViewport(d)) {
         if (
           d.r * transform.k > minRadius ||
           (isFiltering && matchesSearch(d))
@@ -1334,6 +1897,9 @@ folderFilterOutButton.addEventListener("click", function () {
 
           // Highlight for hover, selection, zoom, or search match
           let strokeColor = "#111"; // Default file white
+          if (colorMode === "fileSize") {
+            strokeColor = linearRainbowColorScale(d.depth);
+          }
           let lineWidth = 0.5 / transform.k;
 
           if (d === selectedNode) {
@@ -1427,43 +1993,69 @@ folderFilterOutButton.addEventListener("click", function () {
     ctx.restore(); // Restore context to original state
   }
 
-  // New function to draw ONLY the dynamic highlights on the overlay
   function drawHighlights() {
-    if (isAnimating) {
-      // Don't draw highlights while the main animation is running to prevent lag
-      overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-      return;
-    }
+    // Clear the overlay regardless of animation state
     overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-    if (!hoveredNode) return;
 
+    // Only skip drawing if a main layout animation is running AND we aren't dragging
+    if (isAnimating && !draggedNode) return;
+
+    // Only proceed if there's something to highlight
+    if (!draggedNode && !hoveredNode) {
+        return;
+    }
     overlayCtx.save();
     overlayCtx.translate(transform.x, transform.y);
     overlayCtx.scale(transform.k, transform.k);
-
-    const d = hoveredNode;
     
-    // Draw highlight stroke
-    overlayCtx.beginPath();
-    overlayCtx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
-    overlayCtx.strokeStyle = "#ffa135";
-    overlayCtx.lineWidth = 4 / transform.k;
-    overlayCtx.stroke();
+    // Draw dragged node ghost and line
+    if (draggedNode) {
+        // Draw ghost circle
+        overlayCtx.beginPath();
+        overlayCtx.arc(draggedNode.currentX, draggedNode.currentY, draggedNode.r, 0, 2 * Math.PI);
+        overlayCtx.fillStyle = "rgba(255, 255, 255, 0.3)"; // Semi-transparent white
+        overlayCtx.strokeStyle = "#ffa135";
+        overlayCtx.lineWidth = 2 / transform.k;
+        overlayCtx.fill();
+        overlayCtx.stroke();
 
-    // // Draw label on top
-    // const titleFont = "Roboto, sans-serif";
-    // const text = d.data.name;
-    // let textangle = 30;
-    // if (isEven(d.depth)) textangle = -30;
+        // Draw line from origin
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(draggedNode.originalX, draggedNode.originalY);
+        overlayCtx.lineTo(draggedNode.currentX, draggedNode.currentY);
+        overlayCtx.strokeStyle = "#ffa135";
+        overlayCtx.lineWidth = 1 / transform.k;
+        overlayCtx.setLineDash([5 / transform.k, 5 / transform.k]); // Dashed line
+        overlayCtx.stroke();
+        overlayCtx.setLineDash([]); // Reset line dash
 
-    // if (d.children) {
-    //     var fontSizeTitle = 18 / (transform.k * 1.2);
-    //     if (d === currentZoomNode) fontSizeTitle = fontSizeTitle * 2;
-    //     drawCircularText(overlayCtx, text, fontSizeTitle, titleFont, d.x, d.y, d.r, textangle, 0);
-    // } else {
-    //     var fontSize = 14 / transform.k;
-    //     drawFileText(overlayCtx, text, fontSize, titleFont, d.x, d.y, d.r * 0.75, 0, 0);
-    // }
+        // Highlight target folder during drag to aid the user in placement
+        if (hoveredNode && hoveredNode !== draggedNode && isaFolder(hoveredNode)) {
+            overlayCtx.beginPath();
+            overlayCtx.arc(hoveredNode.x, hoveredNode.y, hoveredNode.r, 0, 2 * Math.PI);
+            overlayCtx.strokeStyle = "#317ced"; // Nircles Blue target highlight
+            overlayCtx.lineWidth = 6 / transform.k;
+            overlayCtx.stroke();
+        }
+
+        if (isMovingSearchSet) {
+            const isMatch = getMatchesSearch();
+            const count = currentDataNodes.filter(isMatch).length;
+            overlayCtx.fillStyle = "white";
+            overlayCtx.font = `${14 / transform.k}px Roboto`;
+            overlayCtx.textAlign = "center";
+            overlayCtx.fillText(`Moving ${count} items`, draggedNode.currentX, draggedNode.currentY - draggedNode.r - (10 / transform.k));
+        }
+    }
+    // Draw hovered node highlight (only if not dragging the same node)
+    else if (hoveredNode) {
+        const d = hoveredNode;
+        overlayCtx.beginPath();
+        overlayCtx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
+        overlayCtx.strokeStyle = "#ffa135";
+        overlayCtx.lineWidth = 4 / transform.k;
+        overlayCtx.stroke();
+    }
 
     overlayCtx.restore();
   }
@@ -1477,6 +2069,19 @@ folderFilterOutButton.addEventListener("click", function () {
     matchedNodes.forEach((d) => {
       thisSum = thisSum + d.value;
     });
+
+    // Update Search Summary Panel
+    const searchSummaryPanel = document.getElementById("searchResultSummary");
+    if (match > 0) {
+        initialDetailsPrompt.classList.add("hidden");
+        selectedItemDetails.classList.add("hidden");
+        searchSummaryPanel.classList.remove("hidden");
+        document.getElementById("summaryMatchCount").textContent = `${matchfolder} folders, ${match - matchfolder} files`;
+        document.getElementById("summaryTotalSize").textContent = formatBytes(thisSum);
+    } else {
+        searchSummaryPanel.classList.add("hidden");
+        if (!selectedNode) initialDetailsPrompt.classList.remove("hidden");
+    }
 
     searchCount.textContent = matchfolder + " folders and " + (match - matchfolder) + " files";
     searchSum.textContent = formatBytes(thisSum);
@@ -1714,14 +2319,22 @@ folderFilterOutButton.addEventListener("click", function () {
   //////////////////////////////////////////////////////////////
   function setColorDomains() {
     // Set domains for color scales
-    const fileTypes = Array.from(
-      new Set(
-        currentDataNodes
-          .filter((d) => !isaFolder(d) && d.data.type)
-          .map((d) => d.data.type),
-      ),
-    );
-    categoricalColorScale.domain(fileTypes);
+    const typeCounts = {};
+    currentDataNodes.forEach(d => {
+        if (!isaFolder(d)) {
+            const t = d.data.type || "unknown";
+            typeCounts[t] = (typeCounts[t] || 0) + 1;
+        }
+    });
+
+    // Identify Top 10 extensions by count
+    window.topFileTypes = Object.entries(typeCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(entry => entry[0]);
+
+    // Domain is restricted to the top 10 to ensure consistent color mapping
+    categoricalColorScale.domain(window.topFileTypes);
 
     const isRelative = relativeDate.checked;
     const nowUnix = Date.now() / 1000;
@@ -1741,32 +2354,43 @@ folderFilterOutButton.addEventListener("click", function () {
     const dateRange = maxDate - minDate;
 
     if (isRelative) {
-      // Use log scale for relative age. Newer items (smaller value) are lighter.
-      linearBWColorScale1 = d3.scaleLog()
-        .range(["#ebebeb", "#000000"])
-        .domain([minDate, maxDate]);
+      // 1. Determine the appropriate unit and divisor for the range
+      const maxDays = d3.max(allDates) || 1;
+      let unit = "days", divisor = 1;
+      if (maxDays > 730) { unit = "years"; divisor = 365; }
+      else if (maxDays > 60) { unit = "months"; divisor = 30.44; }
+      else if (maxDays > 14) { unit = "weeks"; divisor = 7; }
       
-      minDateLabel.textContent = minDate.toFixed(2) + " days old";
-      maxDateLabel.textContent = maxDate.toFixed(1) + " days old";
+      window.currentAgeUnit = unit;
+      window.currentAgeDivisor = divisor;
+
+      // 2. Use Log2 scale. Newer items (smaller unit value) are lighter.
+      linearBWColorScale1 = d3.scaleLog()
+        .base(2)
+        .range(["#ebebeb", "#000000"])
+        .domain([1, Math.max(2, maxDays / divisor)]); // Domain in selected units
+      
+      minDateLabel.textContent = "Newest";
+      maxDateLabel.textContent = "Oldest (" + formatAge(maxDays) + ")";
     } else {
       // Use linear scale for absolute time. Newer items (larger timestamp) are lighter.
       linearBWColorScale1 = d3.scaleLinear()
         .range(["#000000", "#ebebeb"]);
         
-      linearBWColorScale1.domain([minDate, maxDate]);
+      linearBWColorScale1.domain([minDate, maxDate]); // Use linear scale for absolute time
 
-      minDateLabel.textContent = minDate ? new Date(minDate * 1000).toLocaleDateString() : "";
-      maxDateLabel.textContent = maxDate ? new Date(maxDate * 1000).toLocaleDateString() : "";
+      minDateLabel.textContent = minDate ? d3.timeFormat("%d.%m.%Y")(new Date(minDate * 1000)) : "";
+      maxDateLabel.textContent = maxDate ? d3.timeFormat("%d.%m.%Y")(new Date(maxDate * 1000)) : "";
     }
     
     window.linearBWColorScale1 = linearBWColorScale1;
     linearBWColorScale2.domain([minDate, maxDate]);
 
-    const allFileSizes = currentDataNodes
-      .filter((d) => !isaFolder(d))
-      .map((d) => d.value);
-    const minFileSize = d3.min(allFileSizes) || 0;
-    const maxFileSize = d3.max(allFileSizes) || 1; // Avoid division by zero
+    // Consider all nodes (files and folders) for the size scale domain
+    const allSizes = currentDataNodes.map((d) => d.value);
+    // Log scale domain must be > 0. Clamp minimum to 1 byte.
+    const minFileSize = Math.max(1, d3.min(allSizes) || 1);
+    const maxFileSize = Math.max(minFileSize + 1, d3.max(allSizes) || 10);
     exponentialColorScale.domain([minFileSize, maxFileSize]);
 
     const allFileDepths = currentDataNodes
@@ -1779,6 +2403,17 @@ folderFilterOutButton.addEventListener("click", function () {
 
   }
 
+  // Helper function to format age in days to human-readable units
+  function formatAge(days) {
+      if (days < 1) return "<1 day";
+      if (days < 7) return `${Math.round(days)} day${Math.round(days) === 1 ? '' : 's'}`;
+      if (days < 30) return `${Math.round(days / 7)} week${Math.round(days / 7) === 1 ? '' : 's'}`;
+      if (days < 365) return `${Math.round(days / 30.44)} month${Math.round(days / 30.44) === 1 ? '' : 's'}`; // Average days in month
+      if (days < 365 * 5) return `${Math.round(days / 365)} year${Math.round(days / 365) === 1 ? '' : 's'}`;
+      if (days < 365 * 10) return `${Math.round(days / 365)} years`;
+      return `${Math.round(days / 365)} years+`;
+  }
+
   // Function to get color based on selected option
   function getNodeColor(d) {
     const colorMode = colorBySelect.value;
@@ -1787,7 +2422,9 @@ folderFilterOutButton.addEventListener("click", function () {
 
     let dateValue = d.data.last_modified_unix;
     if (dateValue && isRelative) {
-      dateValue = Math.max(0.001, (nowUnix - dateValue) / 86400);
+      const daysOld = Math.max(0.001, (nowUnix - dateValue) / 86400);
+      const divisor = window.currentAgeDivisor || 1;
+      dateValue = Math.max(1, daysOld / divisor); // Convert to units and clamp to domain start
     }
 
     if (isaFolder(d)) {
@@ -1801,7 +2438,7 @@ folderFilterOutButton.addEventListener("click", function () {
       } else if (colorMode === "date") {
         return dateValue ? linearBWColorScale1(dateValue) : "#888";
       } else if (colorMode === "fileSize") {
-        return exponentialColorScale(d.value);
+        return exponentialColorScale(Math.max(1, d.value)); // Guard against 0 for log scale
       }
       return "#888"; // Default folder color
     } else {
@@ -1809,13 +2446,14 @@ folderFilterOutButton.addEventListener("click", function () {
       if (colorMode === "ratio") {
         return "#ffffff"; // Files appear white when coloring by ratio
       } else if (colorMode === "type") {
-        return categoricalColorScale(d.data.type);
+        const type = d.data.type || "unknown";
+        return window.topFileTypes.includes(type) ? categoricalColorScale(type) : "#bfc3ba"; // Use AshGrey for others
       } else if (colorMode === "depth") {
         return linearRainbowColorScale(d.depth);
       } else if (colorMode === "date") {
         return dateValue ? linearBWColorScale1(dateValue) : "#ccc";
       } else if (colorMode === "fileSize") {
-        return exponentialColorScale(d.value);
+        return exponentialColorScale(Math.max(1, d.value)); // Guard against 0 for log scale
       }
       return "#ccc"; // Default file color
     }
@@ -1829,7 +2467,7 @@ folderFilterOutButton.addEventListener("click", function () {
     const ratioLegendItems = document.getElementById("ratioLegendItems"); // New ratio legend
     const ratioGraphItems = document.getElementById("ratioGraphItems");
     
-    [typeLegendItems, dateLegendItems, depthLegendItems, fileSizeLegendItems, ratioLegendItems, ratioGraphItems].forEach(el => {
+    [typeLegendItems, dateLegendItems, depthLegendItems, fileSizeLegendItems, ratioLegendItems, ratioGraphItems, searchSummary].forEach(el => {
       if(el) el.classList.add("hidden");
     });
 
@@ -1842,7 +2480,10 @@ folderFilterOutButton.addEventListener("click", function () {
     }
     if (mode === "date") dateLegendItems.classList.remove("hidden");
     if (mode === "depth") depthLegendItems.classList.remove("hidden");
-    if (mode === "fileSize") fileSizeLegendItems.classList.remove("hidden");
+    if (mode === "fileSize") {
+        fileSizeLegendItems.classList.remove("hidden");
+        searchSummary.classList.remove("hidden");
+    }
   }
 
   function zoomToNode(node) {
@@ -1929,9 +2570,19 @@ folderFilterOutButton.addEventListener("click", function () {
       .sum((d) => Math.pow(d.value, ignoreSize.value / 100))
       .sort((a, b) => sortItOut(a, b));
 
+    // Sync ratio calculation for consistency
+    root.descendants().forEach(d => {
+        if (isaFolder(d)) d.data.folderFileRatio = calculateFolderRatio(d);
+    });
+
       const pack = d3
           .pack()
           .size([containerWidth, containerHeight])
+          .padding(d => {
+              const ratio = d.data ? (d.data.folderFileRatio || 0) : 0;
+              const basePadding = Math.pow(parseFloat(paddingFactorslider.value) / 1200, 2);
+              return basePadding / (1 + (ratio / 10));
+          });
           .padding(Math.pow(paddingFactorslider.value / 1200, 2));
       //.padding(Math.pow(paddingFactorslider.value / 1200, 2));
 
@@ -2146,26 +2797,50 @@ function exportCanvasAsPNG() {
     selectedNode = node;
     detailName.textContent = selectedNode.data.name;
     detailType.textContent = selectedNode.data.type || "Folder";
+    
+    document.getElementById("searchResultSummary").classList.add("hidden");
     // Display details in the third column
       selectedItemDetails.classList.remove("hidden");
       copyPathButton.classList.remove("hidden");
       initialDetailsPrompt.classList.add("hidden");
       
-      if (isaFolder(selectedNode)) {
-        folderSpecificActions.classList.remove("hidden");
-        detailChildren.textContent =
-          selectedNode.descendants().length + " total";
-        
-    const directories = selectedNode.descendants().filter((d) => isaFolder(d));
-    const files = selectedNode.descendants().filter((d) => !isaFolder(d));
-    
-    // Use the same logic as the main calculator to avoid Infinity in the UI
-    const subFolders = directories.length - 1; // Exclude the selected folder itself
-    const ratio = subFolders === 0 ? files.length : files.length / subFolders;
+    // Inject contextual buttons
+    itemContextActions.innerHTML = "";
+    const btnRename = document.createElement("button");
+    btnRename.className = "small-btn";
+    btnRename.textContent = "Rename";
+    btnRename.onclick = () => window.triggerRename(node);
+    itemContextActions.appendChild(btnRename);
 
-    detailChildren.innerHTML = `${directories.length} folders and ${files.length} files
-      <div><strong>Ratio: </strong>${ratio.toFixed(2)}</div> `;
-      } else {
+    if (isaFolder(node)) {
+        const btnNew = document.createElement("button");
+        btnNew.className = "small-btn";
+        btnNew.textContent = "New Folder";
+        btnNew.onclick = () => window.triggerNewFolder(node);
+        itemContextActions.appendChild(btnNew);
+    }
+
+    const btnDel = document.createElement("button");
+    btnDel.className = "small-btn";
+    btnDel.style.backgroundColor = "var(--AshGrey)";
+    btnDel.textContent = "Delete";
+    btnDel.onclick = () => window.triggerDelete(node);
+    itemContextActions.appendChild(btnDel);
+
+    if (isaFolder(selectedNode)) {
+        folderSpecificActions.classList.remove("hidden");
+        
+        const children = selectedNode.children || [];
+        const dirCount = children.filter(d => isaFolder(d)).length;
+        const fileCount = children.length - dirCount;
+        const totalDescendants = selectedNode.descendants().length - 1;
+
+        detailChildren.innerHTML = `
+            ${dirCount} folders, ${fileCount} files (immediate)
+            <div class="small-text">${totalDescendants} total items in subtree</div>
+            <div><strong>Ratio: </strong>${(selectedNode.data.folderFileRatio || 0).toFixed(2)}</div>
+        `;
+    } else {
         folderSpecificActions.classList.add("hidden");
         detailChildren.textContent = "";
       }
@@ -2220,7 +2895,7 @@ function exportCanvasAsPNG() {
         searchItems.appendChild(resultItem);
       });
     } else {
-      searchSummary.classList.add("hidden");
+      if (colorBySelect.value !== "fileSize") searchSummary.classList.add("hidden");
     }
   }
 

@@ -147,6 +147,7 @@ function resetAllGraphs(){
       };
       window.currentFilterDescription = `Depth between ${minD} and ${maxD}`;
       if(window.drawVisualization) window.drawVisualization();
+      if(window.drawHighlights) window.drawHighlights();
     }
   }
 
@@ -171,22 +172,25 @@ function resetAllGraphs(){
         .map(d => {
             return {
                 ...d.data,
-                // Clamp for visual grouping in histogram only
-                displayRatio: Math.min(50, d.data.folderFileRatio)
+                // Clamp to 64 for visual grouping
+                displayRatio: Math.max(1, Math.min(64, d.data.folderFileRatio))
             };
         });
 
     if (folderData.length === 0) return;
 
-    const x = d3.scaleLinear()
-      .domain([0, 50])
-      .nice()
+    const x = d3.scaleLog()
+      .base(2)
+      .domain([1, 64]) 
       .range([0, width]);
+
+    // Create thresholds for 2 bins between each tick (2, 4, 8, 16, 32, 64)
+    const thresholds = d3.range(0, 6.5, 0.5).map(v => Math.pow(2, v));
 
     const histogram = d3.bin()
       .value(d => d.displayRatio)
-      .domain([0, 50])
-      .thresholds(d3.range(0, 52, 2)); // Exactly 20 bins (5 units each)
+      .domain(x.domain())
+      .thresholds(thresholds);
 
     const bins = histogram(folderData);
 
@@ -206,7 +210,7 @@ function resetAllGraphs(){
 
     svg.append("g")
       .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).ticks(5).tickFormat(d => d === 50 ? "50+" : d));
+      .call(d3.axisBottom(x).tickValues([2, 4, 8, 16, 32, 64]).tickFormat(d => d === 64 ? "64+" : d));
 
     svg.append("g").call(d3.axisLeft(y).ticks(5));
 
@@ -223,16 +227,17 @@ function resetAllGraphs(){
 
         const [minR, maxR] = selection.map(x.invert);
         window.currentFilterFunction = (d) => {
-            const ratio = d.folderFileRatio;
+            const ratio = d.data ? d.data.folderFileRatio : d.folderFileRatio;
             if (ratio === undefined) return false;
             
-            // If selection reaches the 50 mark, treat it as "50 or more" 
+            // If selection reaches the 64 mark, treat it as "64 or more" 
             // to ensure high-ratio outliers aren't filtered out.
-            if (maxR >= 48) return ratio >= minR;
+            if (maxR >= 62) return ratio >= minR;
             return ratio >= minR && ratio <= maxR;
         };
-        window.currentFilterDescription = `Ratio ${minR.toFixed(0)} to ${maxR >= 48 ? "50+" : maxR.toFixed(0)}`;
+        window.currentFilterDescription = `Ratio ${minR.toFixed(1)} to ${maxR >= 62 ? "64+" : maxR.toFixed(1)}`;
         if(window.drawVisualization) window.drawVisualization();
+        if(window.drawHighlights) window.drawHighlights();
       });
 
     svg.append("g").attr("class", "brush").call(brush);
@@ -251,6 +256,10 @@ function resetAllGraphs(){
     const root = d3.hierarchy(dataset);
     const typeCounts = {};
     root.leaves().forEach((leaf) => {
+      // Exclude empty folders (which D3 treats as leaves) from the file type pie chart
+      const isFolder = leaf.data.type === "folder" || leaf.data.type === "Folder" || leaf.data.type === "Directory";
+      if (isFolder) return;
+
       const type = leaf.data.type || "unknown";
       typeCounts[type] = (typeCounts[type] || 0) + 1;
     });
@@ -287,7 +296,10 @@ function resetAllGraphs(){
       .selectAll()
       .data(data_ready)
       .join("path")
-      .attr("fill", (d) => color(d[0]))
+      .attr("fill", (d) => {
+          const type = d.data[0];
+          return window.topFileTypes.includes(type) ? color(type) : "#bfc3ba";
+      })
       .attr("d", arc);
 
     // 3. Draw Slices
@@ -300,7 +312,10 @@ function resetAllGraphs(){
       .attr("y", 0)
       .attr("width", 45)
       .attr("height", 20)
-      .attr("fill", (d) => color(d.data[0]))
+      .attr("fill", (d) => {
+          const type = d.data[0];
+          return window.topFileTypes.includes(type) ? color(type) : "#bfc3ba";
+      })
       .attr("stroke", "white")
       .attr("cursor", "pointer")
       .on("mouseover", (event, d) => {
@@ -318,6 +333,7 @@ function resetAllGraphs(){
           window.currentFilterDescription = `Type is .${selectedType}`;
         }
         if(window.drawVisualization) window.drawVisualization();
+        if(window.drawHighlights) window.drawHighlights();
       });
 
     // 4. Add Centered Labels (Filtered by Angle)
@@ -356,31 +372,37 @@ function resetAllGraphs(){
       .filter(d => d.data.last_modified_unix)
       .map((d) => {
         const data = d.data;
-        // Age in days. Minimum 0.001 to support log scale.
         data.age = Math.max(0.001, (nowUnix - data.last_modified_unix) / 86400);
-        data.dateObject = new Date(data.last_modified_unix * 1000);
         return data;
       });
 
     if (allFiles.length === 0) return;
 
     // 2. Scales
-    let x;
-    if (isRelative) {
-      x = d3.scaleLog()
-        .domain(d3.extent(allFiles, d => d.age))
-        .range([0, width]);
-    } else {
-      x = d3.scaleTime()
-        .domain(d3.extent(allFiles, d => d.dateObject))
-        .range([0, width]);
-    }
+    // Determine unit based on max age
+    const maxDays = d3.max(allFiles, d => d.age) || 1;
+    let unit = "days", divisor = 1;
+    if (maxDays > 730) { unit = "years"; divisor = 365; }
+    else if (maxDays > 60) { unit = "months"; divisor = 30.44; }
+    else if (maxDays > 14) { unit = "weeks"; divisor = 7; }
+
+    const maxUnits = maxDays / divisor;
+    const maxExp = Math.ceil(Math.log2(Math.max(2, maxUnits)));
+    const domainMax = Math.pow(2, maxExp);
+
+    const x = d3.scaleLog().base(2)
+      .domain([1, domainMax])
+      .range([0, width]);
 
     // 3. Binning (Histogram)
+    const maxExpThreshold = Math.ceil(Math.log2(x.domain()[1]));
+    const thresholds = d3.range(0, maxExpThreshold + 0.5, 0.5).map(v => Math.pow(2, v));
+    allFiles.forEach(d => d.ageUnit = d.age / divisor);
+
     const histogram = d3.bin()
-      .value(d => isRelative ? d.age : d.dateObject)
+      .value(d => d.ageUnit)
       .domain(x.domain())
-      .thresholds(x.ticks(isRelative ? 10 : 20));
+      .thresholds(thresholds);
 
     const bins = histogram(allFiles);
 
@@ -400,9 +422,10 @@ function resetAllGraphs(){
       .attr("fill", d => window.linearBWColorScale1(d.x0));
 
     // 5. Axes
-    const xAxis = isRelative 
-      ? d3.axisBottom(x).ticks(5, ".0f") 
-      : d3.axisBottom(x).ticks(3).tickFormat(d3.timeFormat("%d.%m.%Y"));
+    const xAxis = d3.axisBottom(x)
+        .tickValues(thresholds.filter((_, i) => i % 2 === 0))
+        .tickFormat(d => `${d} ${unit}`)
+        .tickSizeOuter(0);
 
     svg
       .append("g")
@@ -431,13 +454,7 @@ function resetAllGraphs(){
           const val = x.invert(mx);
           const bin = bins.find(b => val >= b.x0 && val < b.x1);
           if (bin) {
-              let rangeLabel;
-              if (isRelative) {
-                  rangeLabel = `${bin.x0.toFixed(1)} - ${bin.x1.toFixed(1)} days ago`;
-              } else {
-                  const fmt = d3.timeFormat("%d.%m.%Y");
-                  rangeLabel = `${fmt(bin.x0)} - ${fmt(bin.x1)}`;
-              }
+              const rangeLabel = `${window.formatAge(bin.x0 * divisor)} - ${window.formatAge(bin.x1 * divisor)}`;
               updateGraphTooltip(event, `<strong>Range: ${rangeLabel}</strong><br/>Files: ${bin.length}`);
           }
       })
@@ -454,16 +471,27 @@ function resetAllGraphs(){
       // Convert pixel selection back to Dates
       const [minVal, maxVal] = selection.map(x.invert);
       
+      // Detect if the brush is at the start of the log scale (approx zero)
+      const isAtStart = minVal <= x.domain()[0] * 1.01; 
+      
       window.currentFilterFunction = (d) => {
-          const checkVal = isRelative 
-            ? Math.max(0.001, (nowUnix - d.last_modified_unix) / 86400)
-            : new Date(d.last_modified_unix * 1000);
-          return checkVal >= minVal && checkVal <= maxVal;
+          const currentDivisor = window.currentAgeDivisor || 1;
+          const ageInDays = Math.max(0.001, (nowUnix - d.last_modified_unix) / 86400);
+          const ageInUnits = ageInDays / currentDivisor;
+
+          // If at start, ignore the minimum threshold to catch everything "newer" than the baseline
+          const satisfiesMin = isAtStart ? true : ageInUnits >= minVal;
+          const satisfiesMax = (maxVal >= x.domain()[1]) ? true : ageInUnits <= maxVal;
+
+          return satisfiesMin && satisfiesMax;
       };
-      window.currentFilterDescription = isRelative 
-        ? `Age between ${minVal.toFixed(1)} and ${maxVal.toFixed(1)} days`
-        : `Date between ${minVal.toLocaleDateString()} and ${maxVal.toLocaleDateString()}`;
+
+      window.currentFilterDescription = isAtStart 
+        ? `Age less than ${window.formatAge(maxVal * divisor)}`
+        : `Age between ${window.formatAge(minVal * divisor)} and ${window.formatAge(maxVal * divisor)}`;
+
       if(window.drawVisualization) window.drawVisualization();
+      if(window.drawHighlights) window.drawHighlights();
     }
 }
   
@@ -483,43 +511,50 @@ function resetAllGraphs(){
 
     // --- DATA PROCESSING ---
     const root = d3.hierarchy(dataset);
-    const allFiles = root.leaves().filter(d => d.data.value > 0).map(d => d.data);
+    // Exclude folders from the size graph
+    const allFiles = root.leaves()
+      .filter(d => {
+          const isFolder = d.data.type === "folder" || d.data.type === "Folder" || d.data.type === "Directory";
+          return d.data.value > 0 && !isFolder;
+      })
+      .map(d => d.data);
 
     if (allFiles.length === 0) return;
 
-    // --- SCALES ---
-    const extent = d3.extent(allFiles, (d) => d.value);
-    // Round down to the nearest power of 10 for the min, and up for the max
-       const k = 1024;
-
-    // Round down to the nearest power of 1024 for min, and up for max
-    const domainMin = Math.pow(k, Math.floor(Math.log(extent[0]) / Math.log(k)));
-    const domainMax = Math.pow(k, Math.ceil(Math.log(extent[1]) / Math.log(k)));
-
-    // Generate specific "round" tick values to align with formatBytes logic
-    const tickValues = [];
-    for (let i = 0; i <= 8; i++) {
-        const unitPower = Math.pow(k, i);
-        [1, 10, 100].forEach(multiplier => {
-            const val = unitPower * multiplier;
-            if (val >= domainMin && val <= domainMax) tickValues.push(val);
-        });
+      // --- SCALES AND THRESHOLDS ---
+    const k = 1024;
+    const extent = d3.extent(allFiles, d => d.value);
+    
+    // Calculate the power range (0=B, 1=KB, 2=MB, etc.)
+    const minPower = Math.max(0, Math.floor(Math.log(extent[0]) / Math.log(k)));
+    const maxPower = Math.ceil(Math.log(extent[1]) / Math.log(k));
+    
+    // Determine major ticks (round units) and sample to max 4
+    let majorPowers = d3.range(minPower, maxPower + 1);
+    if (majorPowers.length > 4) {
+        const step = (majorPowers.length - 1) / 3;
+        majorPowers = [0, 1, 2, 3].map(i => majorPowers[Math.round(i * step)]);
     }
 
-    // If range is very large, take every second or third tick to prevent congestion
-    const finalTicks = tickValues.length > 8 ? tickValues.filter((_, i) => i % 2 === 0) : tickValues;
+    const tickValues = majorPowers.map(p => Math.pow(k, p));
+
 
     const x = d3
       .scaleLog()
-      .domain([domainMin, domainMax])
+      .base(k)
+      .domain([Math.pow(k, minPower), Math.pow(k, maxPower)])
       .range([0, width]);
 
     // --- BINNING ---
+    
+    // Create thresholds: exactly two bins between each unit power (e.g., thresholds at k^0, k^0.5, k^1...)
+    const thresholds = d3.range(minPower, maxPower + 0.25, 0.25).map(p => Math.pow(k, p));
+
     const histogram = d3
       .bin()
-      .value((d) => d.value)
+      .value(d => d.value)
       .domain(x.domain())
-      .thresholds(x.ticks(12));
+      .thresholds(thresholds);
 
     const bins = histogram(allFiles);
 
@@ -533,17 +568,17 @@ function resetAllGraphs(){
       .selectAll("rect")
       .data(bins)
       .join("rect")
-      .attr("x", (d) => x(d.x0))
+      .attr("x", d => x(d.x0))
       .attr("width", (d) => Math.max(0, x(d.x1) - x(d.x0) - 1))
-      .attr("y", (d) => y(d.length))
+      .attr("y", d => y(d.length))
       .attr("height", (d) => height - y(d.length))
-      .attr("fill", (d) => window.exponentialColorScale(d.x0));
+      .attr("fill", d => window.exponentialColorScale(d.x0));
 
     // --- AXES ---
     svg
       .append("g")
       .attr("transform", `translate(0,${height})`)
-      .call(d3.axisBottom(x).tickValues(finalTicks).tickFormat(window.formatBytes));
+      .call(d3.axisBottom(x).tickValues(tickValues).tickFormat(window.formatBytes));
 
   svg.append("g").call(d3.axisLeft(y).tickValues(y.domain()));
 
@@ -583,9 +618,11 @@ function resetAllGraphs(){
       const [minSize, maxSize] = selection.map(x.invert);
       
       window.currentFilterFunction = (d) => {
-          return d.value !== undefined && d.value >= minSize && d.value <= maxSize;
+          const isFolder = d.type === "folder" || d.type === "Folder" || d.type === "Directory" || d.type === "directory";
+          return !isFolder && d.value !== undefined && d.value >= minSize && d.value <= maxSize;
       };
       window.currentFilterDescription = `Size between ${window.formatBytes(minSize)} and ${window.formatBytes(maxSize)}`;
       if(window.drawVisualization) window.drawVisualization();
+      if(window.drawHighlights) window.drawHighlights();
     }
   }
