@@ -123,7 +123,7 @@ def create_folder_structure_json_bfs(path, current_depth=0, visited_paths=None):
     root_canon = canonical(path)
     result = {
         'path': os.path.normpath(path),
-        'name': os.path.basename(path),
+        'name': os.path.basename(path) or path,
         'type': 'folder',
         'value': '0',  # Placeholder
         'children': []
@@ -337,7 +337,7 @@ def scan_folder_concurrently(root_path):
     """
     overall_result = {
         'path': os.path.normpath(root_path),
-        'name': os.path.basename(root_path),
+        'name': os.path.basename(root_path) or root_path,
         'type': 'folder',
         'value': '0',
         'children': []

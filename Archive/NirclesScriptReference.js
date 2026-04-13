@@ -100,32 +100,21 @@ document.addEventListener("DOMContentLoaded", function () {
   let currentDataNodes = []; // Store the flattened nodes for event handling
   let rootNodeData = null; // Store the original root data for full zoom out
   let hoveredNode = window.hoveredNode || null; // Track the node currently under the mouse
-  let selectedNode = window.selectedNode || null; // Primary selected node
-  let selectedNodes = new Set(); // For multi-selection
-  let searchResults = []; // Store nodes matching the current search
+  let selectedNode = window.selectedNode ||null; // Track the node currently selected by click for details panel
+  let searchResults = []; // Shared search results state
   let currentZoomNode = window.currentZoomNode ||null; // Track the node currently zoomed into
-  let visualZoomDepth = 0; // Interpolated depth for smooth alpha transitions
-  let maxVisibleDepthRelative = 3.2; // Default 3.2 levels deep
-
-  let userSelectedMode = false; // Tracks the button-selected mode (Navigate/Org)
-  let isOrganizeMode = false;
-  let draggedNode = null; // Track the node currently being dragged
-  let isMovingSearchSet = false; // Track if we are moving multiple items via search
+    let isOrganizeMode = false;
+    let draggedNode = null; // Track the node currently being dragged
+    let isMovingSearchSet = false; // Track if we are moving multiple items via search
+    let pendingChanges = [];
+    let hasUnsavedChanges = false;
+    let filtered = false;   
+    let filterString = "";
   let activeFilters = [];
-  let pendingChanges = [];
-  let hasUnsavedChanges = false;
-  let filtered = false;
-  let filterString = "";
   let isAnimating = false;
   let isDragging = false;
   let startX, startY;
   const dragThreshold = 5; // Minimum pixels moved to count as a drag
-
-  // Get references to the depth slider elements (now assumed to be in HTML)
-  const depthSliderContainer = document.getElementById("depthSliderContainer");
-  const depthVisibilitySlider = document.getElementById("depthVisibilitySlider");
-  const depthLabel = document.getElementById("depthLabel");
-
 
   // D3 Zoom transform state (k for scale, x/y for translate)
   let transform = d3.zoomIdentity;
@@ -171,7 +160,7 @@ document.addEventListener("DOMContentLoaded", function () {
     .scaleLinear()
     .range(["#98edfa", "#f26e6e"])
     .interpolate(d3.interpolateHslLong); // Rainbow for folder depth
-  let linearBWColorScale1 = d3.scaleLinear().range(["#eee","#222"]); // Black and white for date modified
+  let linearBWColorScale1 = d3.scaleLinear().range(["#000000", "#ebebeb"]);
   const linearBWColorScale2 = d3.scaleLinear().range(["#009900", "#F2EFEC"]); // Shades of green and white for folder depth
 
   // New color scale for folder ratio
@@ -509,7 +498,9 @@ document.addEventListener("DOMContentLoaded", function () {
       drawVisualization();
       drawHighlights(); // Sync overlay with zoom
     })
-    .on("end", (event) => {
+    .on("end", () => {
+      // VITAL: Update the D3 zoom state so panning starts from THIS position
+      d3.select(canvas).property("__zoom", transform); 
       isAnimating = false;
       drawHighlights(); // Sync overlay with zoom
     });
@@ -534,8 +525,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const drag = d3.drag()
     .on("start", (event) => {
         if (!isOrganizeMode) return;
-        // Use the currently hovered node or find the node at the mouse position
-        const node = hoveredNode || findNodeAt(event.sourceEvent.clientX, event.sourceEvent.clientY);
+        const node = findNodeAt(event.x, event.y);
         if (node) {
             event.subject.node = node;
             canvas.style.cursor = "grabbing";
@@ -556,27 +546,20 @@ document.addEventListener("DOMContentLoaded", function () {
     })
     .on("drag", (event) => {
         if (!isOrganizeMode || !event.subject.node) return;
-        const rect = canvas.getBoundingClientRect();
         // Update current position in data space
-        draggedNode.currentX = (event.sourceEvent.clientX - rect.left - transform.x) / transform.k;
-        draggedNode.currentY = (event.sourceEvent.clientY - rect.top - transform.y) / transform.k;
+        draggedNode.currentX = (event.x - transform.x) / transform.k;
+        draggedNode.currentY = (event.y - transform.y) / transform.k;
 
         // Detect if we are hovering over a potential target folder during the drag
-        hoveredNode = findNodeAt(event.sourceEvent.clientX, event.sourceEvent.clientY);
+        hoveredNode = findNodeAt(event.x, event.y);
 
         drawHighlights(); // Redraw ghost and line
     })
     .on("end", (event) => {
         if (!isOrganizeMode || !event.subject.node) return;
         canvas.style.cursor = "grab";
-        
-        let targetNode = findNodeAt(event.sourceEvent.clientX, event.sourceEvent.clientY);
+        const targetNode = findNodeAt(event.x, event.y);
         const sourceNode = event.subject.node;
-
-        // Improvement: If the target is a file, redirect the drop to its parent folder
-        if (targetNode && !isaFolder(targetNode)) {
-            targetNode = targetNode.parent;
-        }
 
         if (targetNode && targetNode !== sourceNode && isaFolder(targetNode)) {
             // Sync changes to Master Data to preserve across filter resets
@@ -645,17 +628,11 @@ document.addEventListener("DOMContentLoaded", function () {
   function findNodeAt(rawX, rawY) {
       const rect = canvas.getBoundingClientRect();
       // Transform screen coordinates to visualization coordinates
-      const x = (rawX - rect.left - transform.x) / transform.k;
-      const y = (rawY - rect.top - transform.y) / transform.k;
-      const zoomDepth = currentZoomNode ? currentZoomNode.depth : 0;
+      const x = (rawX - transform.x) / transform.k;
+      const y = (rawY - transform.y) / transform.k;
 
       for (let i = currentDataNodes.length - 1; i >= 0; i--) {
           const d = currentDataNodes[i];
-          
-          // Respect the depth filter for selectability
-          const relativeDepth = d.depth - zoomDepth;
-          if (maxVisibleDepthRelative < 10 && relativeDepth > Math.ceil(maxVisibleDepthRelative)) continue;
-
           const dx = x - d.x;
           const dy = y - d.y;
           if (Math.sqrt(dx * dx + dy * dy) < d.r) {
@@ -733,11 +710,10 @@ document.addEventListener("DOMContentLoaded", function () {
       const dialog = window.__TAURI_PLUGIN_DIALOG__;
       const shell = window.__TAURI_PLUGIN_SHELL__;
       const fs = window.__TAURI_PLUGIN_FS__;
+      const pathApi = window.__TAURI_PLUGIN_PATH__;
 
       if (!dialog || !shell || !fs) {
-        displayMessageBox("Scan functionality requires the Tauri environment. Loading demo data instead.", "Info");
-        resetButton.click();
-        return;
+        throw new Error("Tauri plugins not found. Ensure you are running the app with 'npm run tauri dev' and that the plugins are installed.");
       }
 
       // 1. Open folder selection window
@@ -750,36 +726,47 @@ document.addEventListener("DOMContentLoaded", function () {
 
       displayMessageBox(`Initiating scan for: ${selectedFolder}. This may take a moment...`, "Info");
 
-      // 2. Prepare the sidecar command
-      const command = window.__TAURI_PLUGIN_SHELL__.Command.sidecar('binaries/scanner', [selectedFolder]);
-      
-      // 3. Use execute() to run the scan and wait for the final result
+      // 2. Execute scanner.py
+      // Note: 'python' must be configured in your tauri.conf.json allowlist/capabilities
+      const command = shell.Command.create('python', ['scanner.py', selectedFolder]);
       const result = await command.execute();
-      const output = result.stdout;
 
+      if (result.stderr) {
+        console.error("Scanner Error Stream:", result.stderr);
+      }
+
+      // 3. Extract JSON from the output stream using markers
+      const output = result.stdout;
       const startMarker = "RESULT_START";
       const endMarker = "RESULT_END";
       const startIndex = output.indexOf(startMarker);
       const endIndex = output.indexOf(endMarker);
 
       if (startIndex === -1 || endIndex === -1) {
-        throw new Error("Invalid scanner output. Check Python dependencies.");
+        throw new Error("The scanner script did not return a valid result block.");
       }
 
       const jsonString = output.substring(startIndex + startMarker.length, endIndex).trim();
       const scannedData = JSON.parse(jsonString);
 
       // 4. Update the view
-      window.immutableRawData = JSON.parse(JSON.stringify(scannedData));
-      window.originalFullData = JSON.parse(JSON.stringify(scannedData));
       rootNodeData = scannedData;
+      window.originalFullData = JSON.parse(JSON.stringify(rootNodeData));
       processAndRenderVisualization(rootNodeData);
       updateBreadcrumbs();
-      displayMessageBox("Scan complete!", "Success");
+      displayMessageBox("Scan complete! Visualization updated.", "Success");
 
+      // 5. Finally saved as a json summary
+      const savePath = await dialog.save({
+        defaultPath: `${scannedData.name}_scan.json`,
+        filters: [{name: 'JSON', extensions: ['json']}]
+      });
+
+      if (savePath) {
+        await fs.writeTextFile(savePath, JSON.stringify(scannedData, null, 2));
+      }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      displayMessageBox("Scan failed: " + errorMsg, "Error");
+      displayMessageBox("Scan failed: " + err.message, "Error");
       console.error(err);
     }
   });
@@ -815,6 +802,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Event listener for when a file is selected via the input
   jsonFileLoad.addEventListener("change", function (event) {
+      resetZoom(); // Reset zoom to fit the new data
     const file = event.target.files[0];
     if (!file) {
       return; // No file selected
@@ -826,7 +814,6 @@ document.addEventListener("DOMContentLoaded", function () {
         window.originalFullData = JSON.parse(JSON.stringify(window.immutableRawData)); // Master Architecture
         rootNodeData = JSON.parse(JSON.stringify(window.immutableRawData)); // Initial view
         processAndRenderVisualization(rootNodeData);
-        resetZoom(); // Reset zoom to fit the new data
         searchInput.value = ""; // Clear search on new load
         searchTerm = "";
         folderSummary.value = ""; //Clear summary
@@ -837,7 +824,6 @@ document.addEventListener("DOMContentLoaded", function () {
         window.currentFilterFunction = null; // Clear any graph filters
         window.currentFilterDescription = null; 
         updateBreadcrumbs();
-        animateDepthShowcase();
 
       } catch (error) {
         displayMessageBox(
@@ -927,7 +913,7 @@ document.addEventListener("DOMContentLoaded", function () {
             <p>${message}</p>
             <div style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
                 <button id="confirmActionBtn">Yes</button>
-                <button id="cancelActionBtn" style="background-color: var(--Black);">No</button>
+                <button id="cancelActionBtn" style="background-color: var(--AshGrey);">No</button>
             </div>
         </div>
     `;
@@ -971,127 +957,15 @@ document.addEventListener("DOMContentLoaded", function () {
   newFolderButton.addEventListener("click", () => window.triggerNewFolder(selectedNode));
 
   // Interaction Toggle Logic
-  panModeBtn.addEventListener("click", () => {
-      userSelectedMode = false;
-      setInteractionMode(false);
-  });
-  orgModeBtn.addEventListener("click", () => {
-      userSelectedMode = true;
-      setInteractionMode(true);
-  });
+  panModeBtn.addEventListener("click", () => setInteractionMode(false));
+  orgModeBtn.addEventListener("click", () => setInteractionMode(true));
 
   function setInteractionMode(organize) {
     isOrganizeMode = organize;
     panModeBtn.classList.toggle("active", !organize);
     orgModeBtn.classList.toggle("active", organize);
     canvas.style.cursor = organize ? "grab" : "crosshair";
-    
-    // Visual cue: darken background when in Organize mode
-    canvas.style.transition = "background-color 0.3s ease";
-    canvas.style.backgroundColor = organize ? "#1e1e26" : "";
   }
-
-  // Keyboard Shortcuts
-  window.addEventListener("keydown", (e) => {
-      const isInputActive = e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA";
-
-      // Shift toggle between Navigate and Organise
-      if (e.key === "Shift") {
-          setInteractionMode(!userSelectedMode);
-      }
-      
-      // F1: Help
-      if (e.key === "F1") {
-          e.preventDefault();
-          displayAboutBox();
-      }
-
-      // F2: Rename
-      if (e.key === "F2" && !isInputActive) {
-          e.preventDefault();
-          if (selectedNode) window.triggerRename(selectedNode);
-      }
-
-      // Delete: Bulk or single deletion
-      if (e.key === "Delete" && !isInputActive) {
-          if (selectedNodes.size > 1) {
-              displayConfirmationBox(`Delete all ${selectedNodes.size} selected items?`, () => {
-                  selectedNodes.forEach(node => {
-                      const masterParent = findInMaster(node.parent.data);
-                      const masterNode = findInMaster(node.data);
-                      if (masterParent && masterNode) {
-                          masterParent.children = masterParent.children.filter(c => c !== masterNode);
-                      }
-                  });
-                  selectedNodes.clear();
-                  selectedNode = null;
-                  applyFilters();
-              });
-          } else if (selectedNode) {
-              window.triggerDelete(selectedNode);
-          }
-      }
-
-      // Escape: Clear selection and close popups
-      if (e.key === "Escape") {
-          selectedNodes.clear();
-          selectedNode = null;
-          selectedItemDetails.classList.add("hidden");
-          document.getElementById("aboutPopup").classList.add("hidden");
-          document.getElementById("viewSettingsMenu").classList.add("hidden");
-          document.getElementById("searchPopup").classList.add("hidden");
-          drawVisualization();
-      }
-
-      // Global Ctrl shortcuts
-      if (e.ctrlKey || e.metaKey) {
-          if (e.key.toLowerCase() === "f") {
-              e.preventDefault();
-              searchInput.focus();
-              searchInput.select();
-          }
-          if (e.key.toLowerCase() === "s") {
-              e.preventDefault();
-              saveScanButton.click();
-          }
-          if (e.key === "+" || e.key === "=") {
-              e.preventDefault();
-              maxVisibleDepthRelative = Math.min(5, maxVisibleDepthRelative + 0.5);
-              depthVisibilitySlider.value = maxVisibleDepthRelative;
-              depthLabel.textContent = maxVisibleDepthRelative >= 5 ? "Deep" : maxVisibleDepthRelative.toFixed(1);
-              drawVisualization();
-          }
-          if (e.key === "-") {
-              e.preventDefault();
-              maxVisibleDepthRelative = Math.max(1, maxVisibleDepthRelative - 0.5);
-              depthVisibilitySlider.value = maxVisibleDepthRelative;
-              depthLabel.textContent = maxVisibleDepthRelative >= 5 ? "Deep" : maxVisibleDepthRelative.toFixed(1);
-              drawVisualization();
-          }
-          if (e.key.toLowerCase() === "a" && !isInputActive) {
-              e.preventDefault();
-              const target = currentZoomNode || currentDataNodes[0];
-              if (target && target.children) {
-                  target.children.forEach(child => selectedNodes.add(child));
-                  selectedNode = target.children[0];
-                  selectedNodeDetails(selectedNode);
-                  drawVisualization();
-              }
-          }
-      }
-  });
-
-  window.addEventListener("keyup", (e) => {
-      if (e.key === "Shift") {
-          setInteractionMode(userSelectedMode);
-      }
-  });
-
-  depthVisibilitySlider.addEventListener("input", (e) => {
-      maxVisibleDepthRelative = parseFloat(e.target.value);
-      depthLabel.textContent = maxVisibleDepthRelative >= 5 ? "Deep" : maxVisibleDepthRelative.toFixed(1);
-      drawVisualization();
-  });
 
   // Reusable Rename Logic
   window.triggerRename = function(node) {
@@ -1668,12 +1542,9 @@ folderFilterOutButton.addEventListener("click", function () {
   }
 
   function initiateVisuals(data) {
-    if (typeof InteractionGraphs === 'function') {
-      InteractionGraphs(data, '#interaction-graph-container');
-    }
-    if (typeof createFolderTree === 'function') {
-      createFolderTree(data, '#folder-tree-container');
-    }
+    InteractionGraphs(data);
+    createFolderTree(data, '#folder-tree-container');
+
     if (typeof createSunburst === 'function') {
       createSunburst(data, '#sunburst-container');
     }
@@ -1688,8 +1559,10 @@ folderFilterOutButton.addEventListener("click", function () {
   // Function to process data and then draw
   function processAndRenderVisualization(data) {
         const containerWidth = visualizationColumn.offsetWidth;
-    // Set canvas height relative to window height, capped by container width for square aspect
-    const containerHeight = Math.min(containerWidth, window.innerHeight - 160);
+    // Calculate available height based on window size and component position
+    const rect = visualizationColumn.getBoundingClientRect();
+    const availableHeight = window.innerHeight - rect.top - 60; 
+    const containerHeight = Math.max(300, Math.min(containerWidth, availableHeight));
 
     canvas.width = containerWidth;
     canvas.height = containerHeight;
@@ -1706,7 +1579,7 @@ folderFilterOutButton.addEventListener("click", function () {
     .sum((d) => {
         const val = parseFloat(d.value) || 0;
         // Ensure empty folders have a minimum weight so they are rendered as circles.
-        if (d.parent && (d.type === "folder" || d.type === "Folder") && (!d.children || d.children.length === 0) && val < 2) {
+        if (d.parent && (d.type === "folder" || d.type === "Folder") && (!d.children || d.children.length === 0) && val === 0) {
           var minNewSize = Math.max(1000, d.parent.value * 0.2); // 20% of parent's effective value or 1000 bytes
             return minNewSize; 
         }
@@ -1724,19 +1597,9 @@ folderFilterOutButton.addEventListener("click", function () {
     const pack = d3.pack()
         .size([containerWidth, containerHeight])
         .padding(d => {
-            const numChildren = d.children ? d.children.length : 0;
             const ratio = d.data ? (d.data.folderFileRatio || 0) : 0;
             const basePadding = Math.pow(parseFloat(paddingFactorslider.value) / 1200, 2);
-
-            // Special handling for single-item folders:
-            // We enforce a minimum padding of 5px to ensure there is always a 
-            // visible and clickable "rim" around the lone child.
-            if (numChildren <= 1) {
-                return Math.max(basePadding, 5);
-            }
-
-            // For multi-item folders, use the density-aware padding:
-            // High density folders get thinner borders to maximize screen real estate.
+            // Inversely proportional: High density folders get thinner borders
             return basePadding / (1 + (ratio / 7));
         });
 
@@ -1886,6 +1749,19 @@ folderFilterOutButton.addEventListener("click", function () {
   function drawVisualization() {
     const minRadius = 1.2;
     ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the entire canvas
+
+    // Draw a consistent background so visualization is visible in all themes
+    ctx.beginPath();
+    ctx.arc(
+      canvas.width / 2,
+      canvas.height / 2,
+      Math.max(canvas.width, canvas.height),
+      0,
+      2 * Math.PI,
+    );
+    ctx.fillStyle = "#F2EFEC"; 
+    ctx.fill();
+
     updateSummary ();
     applyCurrentZoom();
 
@@ -1902,8 +1778,6 @@ folderFilterOutButton.addEventListener("click", function () {
 
     // Determine if any filtering is active (Search text OR Graph brush)
     const isFiltering = searchTerm.length > 1 || window.currentFilterFunction !== null;
-    const zoomDepth = currentZoomNode ? currentZoomNode.depth : 0;
-
 
     if (isFiltering) {
       searchLogic(matchesSearch);
@@ -1916,6 +1790,7 @@ folderFilterOutButton.addEventListener("click", function () {
       filterButton.classList.add("hidden");
       filterOutButton.classList.add("hidden");
       deleteMatchButton.classList.add("hidden");
+      searchResults = "";
       searchResults = [];
       searchCount.textContent = "";
       searchSum.textContent = "";
@@ -1930,10 +1805,6 @@ folderFilterOutButton.addEventListener("click", function () {
       .sort((a, b) => b.r - a.r);
     directories.forEach((d) => {
       if (isInViewport(d)) {
-        
-        const relativeDepth = d.depth - zoomDepth;
-        const isBeyondDepth = maxVisibleDepthRelative < 5 && relativeDepth > maxVisibleDepthRelative;
-
         if ( // Only draw if it's above the minimum radius threshold or matches the search term
           d.r * transform.k > minRadius ||
           (isFiltering && matchesSearch(d))
@@ -1953,7 +1824,7 @@ folderFilterOutButton.addEventListener("click", function () {
           }
           let lineWidth = 0.5 / transform.k;
 
-          if (selectedNodes.has(d) ||
+          if (d === selectedNode ||
               d === currentZoomNode) {
             strokeColor = "#ff7e27"; // Orange for active states
             lineWidth = 5 / transform.k;
@@ -1967,23 +1838,13 @@ folderFilterOutButton.addEventListener("click", function () {
           ctx.strokeStyle = strokeColor;
           ctx.lineWidth = lineWidth;
 
-          let baseAlpha = 1.0;
-// Dim non-matching nodes if a search term is active
+          ctx.globalAlpha = 1.0; // Reset opacity
+          // Dim non-matching nodes if a search term is active
           if (isFiltering && !matchesSearch(d)) {
-baseAlpha = 0.12; // Reduce opacity     
-}
-
-          // Smooth Information Depth Filter
-          if (maxVisibleDepthRelative < 5) {
-              const depthAlpha = Math.max(0.00, Math.min(1.0, maxVisibleDepthRelative - (relativeDepth - 1)));
-              baseAlpha *= depthAlpha;
-            }
-          ctx.globalAlpha = baseAlpha;
-
-
+            ctx.globalAlpha = 0.12; // Reduce opacity
+          }
           ctx.fill();
           ctx.stroke();
-
 
           // --- NEW FOLDER PULSE EFFECT ---
           if (d.data.creationTime && Date.now() - d.data.creationTime < 3000) {
@@ -2008,11 +1869,6 @@ baseAlpha = 0.12; // Reduce opacity
     const files = currentDataNodes.filter((d) => !isaFolder(d));
     files.forEach((d) => {
       if (isInViewport(d)) {
-        const relativeDepth = d.depth - visualZoomDepth;
-
-        // Performance Optimization: Skip drawing entirely if beyond the horizon
-        if (maxVisibleDepthRelative < 5 && relativeDepth > Math.ceil(maxVisibleDepthRelative) + 1) return;
-
         if (
           d.r * transform.k > minRadius ||
           (isFiltering && matchesSearch(d))
@@ -2046,7 +1902,7 @@ baseAlpha = 0.12; // Reduce opacity
           }
           let lineWidth = 0.5 / transform.k;
 
-          if (selectedNodes.has(d)) {
+          if (d === selectedNode) {
             lineWidth = 2.5 / transform.k;
           }
 
@@ -2057,19 +1913,13 @@ baseAlpha = 0.12; // Reduce opacity
 
           ctx.strokeStyle = strokeColor;
           ctx.lineWidth = lineWidth;
+          //ctx.stroke();
 
-          let baseAlpha = 1.0;
+          ctx.globalAlpha = 1.0; // Reset opacity
           // Dim non-matching nodes if a search term is active
           if (isFiltering && !matchesSearch(d)) {
-            baseAlpha = 0.12; // Reduce opacity
+            ctx.globalAlpha = 0.12; // Reduce opacity
           }
-          
-          // Smooth Information Depth Filter (Opacity only)
-          if (maxVisibleDepthRelative < 5) {
-              const depthAlpha = Math.max(0.001, Math.min(1.0, maxVisibleDepthRelative - (relativeDepth - 1)));
-              baseAlpha *= depthAlpha;
-          }
-          ctx.globalAlpha = baseAlpha;
           ctx.fill();
           ctx.stroke();
         }
@@ -2091,11 +1941,6 @@ baseAlpha = 0.12; // Reduce opacity
           1.3 * Math.min(canvas.width, canvas.height) > relSize &&
           relSize > 100); // Visible size range
 
-      const relativeDepth = d.depth - visualZoomDepth;
-      
-      // Skip labels entirely if beyond the horizon
-      if (maxVisibleDepthRelative < 5 && relativeDepth > Math.ceil(maxVisibleDepthRelative) + 0.5) return;
-
       if (isVisibleInZoom) {
         const text = d.data.name;
         ctx.globalAlpha = 1.0; // Reset opacity
@@ -2104,7 +1949,6 @@ baseAlpha = 0.12; // Reduce opacity
         if (isFiltering && !matchesSearch(d)) {
           ctx.globalAlpha = 0.12; // Reduce opacity
         }
-
         let textangle = 30;
         if (isEven(d.depth)) {
           textangle = -30;
@@ -2168,20 +2012,7 @@ baseAlpha = 0.12; // Reduce opacity
     if (draggedNode) {
         // Draw ghost circle
         overlayCtx.beginPath();
-        if (!isaFolder(draggedNode) && hexagonalFiles.checked) {
-            const polySides = 6;
-            for (let i = 0; i < polySides; i++) {
-                const angle = (2 * Math.PI / polySides) * i;
-                const x = draggedNode.currentX + draggedNode.r * Math.sin(angle);
-                const y = draggedNode.currentY + draggedNode.r * Math.cos(angle);
-                if (i === 0) overlayCtx.moveTo(x, y);
-                else overlayCtx.lineTo(x, y);
-            }
-            overlayCtx.closePath();
-        } else {
-            overlayCtx.arc(draggedNode.currentX, draggedNode.currentY, draggedNode.r, 0, 2 * Math.PI);
-        }
-        
+        overlayCtx.arc(draggedNode.currentX, draggedNode.currentY, draggedNode.r, 0, 2 * Math.PI);
         overlayCtx.fillStyle = "rgba(255, 255, 255, 0.3)"; // Semi-transparent white
         overlayCtx.strokeStyle = "#ffa135";
         overlayCtx.lineWidth = 2 / transform.k;
@@ -2198,49 +2029,12 @@ baseAlpha = 0.12; // Reduce opacity
         overlayCtx.stroke();
         overlayCtx.setLineDash([]); // Reset line dash
 
-        // Calculate the actual landing zone (files redirect to parent)
-        let effectiveTarget = hoveredNode;
-        if (effectiveTarget && !isaFolder(effectiveTarget)) {
-            effectiveTarget = effectiveTarget.parent;
-        }
-
-        // Validity check: Not itself, not current parent, and not a descendant
-        let isValid = false;
-        if (effectiveTarget && effectiveTarget !== draggedNode && effectiveTarget !== draggedNode.parent) {
-            let temp = effectiveTarget;
-            let isDescendant = false;
-            while (temp) {
-                if (temp === draggedNode) {
-                    isDescendant = true;
-                    break;
-                }
-                temp = temp.parent;
-            }
-            if (!isDescendant) isValid = true;
-        }
-
-        // Highlight target folder for a valid move
-        if (isValid && effectiveTarget) {
+        // Highlight target folder during drag to aid the user in placement
+        if (hoveredNode && hoveredNode !== draggedNode && isaFolder(hoveredNode)) {
             overlayCtx.beginPath();
-            overlayCtx.arc(effectiveTarget.x, effectiveTarget.y, effectiveTarget.r, 0, 2 * Math.PI);
-            overlayCtx.strokeStyle = "var(--NirclesBlue, #317ced)";
+            overlayCtx.arc(hoveredNode.x, hoveredNode.y, hoveredNode.r, 0, 2 * Math.PI);
+            overlayCtx.strokeStyle = "#317ced"; // Nircles Blue target highlight
             overlayCtx.lineWidth = 6 / transform.k;
-            overlayCtx.stroke();
-        } 
-        // Show an "X" icon near the ghost if hovering over an invalid target
-        else if (hoveredNode) {
-            const xSize = 7 / transform.k;
-            const xPos = draggedNode.currentX + draggedNode.r + (10 / transform.k);
-            const yPos = draggedNode.currentY - draggedNode.r - (10 / transform.k);
-            
-            overlayCtx.beginPath();
-            overlayCtx.moveTo(xPos - xSize, yPos - xSize);
-            overlayCtx.lineTo(xPos + xSize, yPos + xSize);
-            overlayCtx.moveTo(xPos + xSize, yPos - xSize);
-            overlayCtx.lineTo(xPos - xSize, yPos + xSize);
-            
-            overlayCtx.strokeStyle = "#dc2626"; // Error Red
-            overlayCtx.lineWidth = 3 / transform.k;
             overlayCtx.stroke();
         }
 
@@ -2257,19 +2051,7 @@ baseAlpha = 0.12; // Reduce opacity
     else if (hoveredNode) {
         const d = hoveredNode;
         overlayCtx.beginPath();
-        if (!isaFolder(d) && hexagonalFiles.checked) {
-            const polySides = 6;
-            for (let i = 0; i < polySides; i++) {
-                const angle = (2 * Math.PI / polySides) * i;
-                const x = d.x + d.r * Math.sin(angle);
-                const y = d.y + d.r * Math.cos(angle);
-                if (i === 0) overlayCtx.moveTo(x, y);
-                else overlayCtx.lineTo(x, y);
-            }
-            overlayCtx.closePath();
-        } else {
-            overlayCtx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
-        }
+        overlayCtx.arc(d.x, d.y, d.r, 0, 2 * Math.PI);
         overlayCtx.strokeStyle = "#ffa135";
         overlayCtx.lineWidth = 4 / transform.k;
         overlayCtx.stroke();
@@ -2321,7 +2103,7 @@ baseAlpha = 0.12; // Reduce opacity
     );
     ctx.fillStyle = "#F2EFEC";
     ctx.fill();
-    const searchResults = Array.from(
+    searchResults = Array.from(
       new Set(currentDataNodes.filter(matchesSearch)),
     );
     updateSearchResults(searchResults);
@@ -2585,7 +2367,7 @@ baseAlpha = 0.12; // Reduce opacity
       // 2. Use Log2 scale. Newer items (smaller unit value) are lighter.
       linearBWColorScale1 = d3.scaleLog()
         .base(2)
-        .range(["#eee","#222"])
+        .range(["#ebebeb", "#000000"])
         .domain([1, Math.max(2, maxDays / divisor)]); // Domain in selected units
       
       minDateLabel.textContent = "Newest";
@@ -2593,7 +2375,7 @@ baseAlpha = 0.12; // Reduce opacity
     } else {
       // Use linear scale for absolute time. Newer items (larger timestamp) are lighter.
       linearBWColorScale1 = d3.scaleLinear()
-        .range(["#222", "#ebebeb"]);
+        .range(["#000000", "#ebebeb"]);
         
       linearBWColorScale1.domain([minDate, maxDate]); // Use linear scale for absolute time
 
@@ -2654,7 +2436,7 @@ baseAlpha = 0.12; // Reduce opacity
       } else if (colorMode === "depth") {
         return linearRainbowColorScale(d.depth);
       } else if (colorMode === "date") {
-        return dateValue ? linearBWColorScale1(dateValue) : "#fff";
+        return dateValue ? linearBWColorScale1(dateValue) : "#888";
       } else if (colorMode === "fileSize") {
         return exponentialColorScale(Math.max(1, d.value)); // Guard against 0 for log scale
       }
@@ -2669,7 +2451,7 @@ baseAlpha = 0.12; // Reduce opacity
       } else if (colorMode === "depth") {
         return linearRainbowColorScale(d.depth);
       } else if (colorMode === "date") {
-        return dateValue ? linearBWColorScale1(dateValue) : "#fff";
+        return dateValue ? linearBWColorScale1(dateValue) : "#ccc";
       } else if (colorMode === "fileSize") {
         return exponentialColorScale(Math.max(1, d.value)); // Guard against 0 for log scale
       }
@@ -2704,7 +2486,7 @@ baseAlpha = 0.12; // Reduce opacity
     }
   }
 
-  function zoomToNode(node, targetMaxVisibleDepth = null) {
+  function zoomToNode(node) {
     const width = canvas.width;
     const height = canvas.height;
     
@@ -2714,25 +2496,10 @@ baseAlpha = 0.12; // Reduce opacity
     
     const newTransform = d3.zoomIdentity.translate(tx, ty).scale(k);
     
-    const startVisualDepth = visualZoomDepth;
-    const endVisualDepth = node.depth;
-    
     d3.transition().duration(750).tween("zoom", function () {
       const i = d3.interpolate(transform, newTransform);
-      const iVisualDepth = d3.interpolate(startVisualDepth, endVisualDepth);
-      updateBreadcrumbs();
-      let iDepth = null;
-      if (targetMaxVisibleDepth !== null) {
-          iDepth = d3.interpolate(maxVisibleDepthRelative, targetMaxVisibleDepth);
-      }
       return function (t) {
         transform = i(t);
-        visualZoomDepth = iVisualDepth(t);
-        if (iDepth) {
-            maxVisibleDepthRelative = iDepth(t);
-            depthVisibilitySlider.value = maxVisibleDepthRelative;
-            depthLabel.textContent = maxVisibleDepthRelative >= 5 ? "Deep" : maxVisibleDepthRelative.toFixed(1);
-        }
         isAnimating = true;  
             drawVisualization();
             drawHighlights();
@@ -2741,52 +2508,10 @@ baseAlpha = 0.12; // Reduce opacity
         // VITAL: Update the D3 zoom state so panning starts from THIS position
         d3.select(canvas).property("__zoom", newTransform); 
         isAnimating = false;
-        visualZoomDepth = endVisualDepth;
-        if (targetMaxVisibleDepth !== null) {
-            // Ensure final value is set precisely
-            maxVisibleDepthRelative = targetMaxVisibleDepth;
-            depthVisibilitySlider.value = maxVisibleDepthRelative;
-            depthLabel.textContent = maxVisibleDepthRelative >= 5 ? "Deep" : maxVisibleDepthRelative.toFixed(1);
-        }
+        updateBreadcrumbs();
     });
     currentZoomNode = node;
 }
-
-  /**
-   * Animates the depth visibility from current to max and back to show off the data structure.
-   */
-  function animateDepthShowcase() {
-      if (maxVisibleDepthRelative >= 5) return;
-      const originalDepth = maxVisibleDepthRelative;
-      
-      d3.transition()
-          .duration(2500)
-          .ease(d3.easeQuadInOut)
-          .tween("depthShowcase", function() {
-              const i = d3.interpolate(originalDepth, 5);
-              return function(t) {
-                  const val = i(t);
-                  maxVisibleDepthRelative = val;
-                  depthVisibilitySlider.value = val;
-                  depthLabel.textContent = val >= 5 ? "Deep" : val.toFixed(1);
-                  drawVisualization();
-              };
-          })
-          .transition()
-          .duration(2500)
-          .ease(d3.easeQuadInOut)
-          .tween("depthReturn", function() {
-              const i = d3.interpolate(5, originalDepth);
-              return function(t) {
-                  const val = i(t);
-                  maxVisibleDepthRelative = val;
-                  depthVisibilitySlider.value = val;
-                  depthLabel.textContent = val >= 5 ? "Deep" : val.toFixed(1);
-                  drawVisualization();
-              };
-          });
-  }
-
   function resetZoom() {
     currentZoomNode = currentDataNodes[0];
     zoomToNode(currentZoomNode);
@@ -2821,8 +2546,8 @@ baseAlpha = 0.12; // Reduce opacity
 
       if (i < pathNodes.length - 1) {
         const separator = document.createElement("span");
-        separator.textContent = "\u203A"; // Segmented chevron like Explorer
-        separator.className = "breadcrumb-separator";
+        separator.textContent = "\\";
+        separator.className = "mx-1 text-gray-400";
         breadcrumbsDiv.appendChild(separator);
       }
     });
@@ -2855,9 +2580,11 @@ baseAlpha = 0.12; // Reduce opacity
           .size([containerWidth, containerHeight])
           .padding(d => {
               const ratio = d.data ? (d.data.folderFileRatio || 0) : 0;
-              const basePadding = Math.pow(parseFloat(paddingFactorslider.value) / 2000, 2);
+              const basePadding = Math.pow(parseFloat(paddingFactorslider.value) / 1200, 2);
               return basePadding / (1 + (ratio / 10));
           });
+          .padding(Math.pow(paddingFactorslider.value / 1200, 2));
+      //.padding(Math.pow(paddingFactorslider.value / 1200, 2));
 
     const targetNodes = pack(root).descendants();
 
@@ -3017,35 +2744,31 @@ function exportCanvasAsPNG() {
 
   // Event listener for click on canvas
   canvas.addEventListener("click", function (event) {
-    const clickedNode = findNodeAt(event.clientX, event.clientY);
+    const rect = canvas.getBoundingClientRect();
+    // Transform mouse coordinates based on current zoom
+    const mouseX = (event.clientX - rect.left - transform.x) / transform.k;
+    const mouseY = (event.clientY - rect.top - transform.y) / transform.k;
+
+    let clickedNode = null;
+    // Iterate through nodes in reverse order to detect smaller, top-most circles first
+    for (let i = currentDataNodes.length - 1; i >= 0; i--) {
+      const d = currentDataNodes[i];
+      const dx = mouseX - d.x;
+      const dy = mouseY - d.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < d.r) {
+        window.selectedNode = d; // Store clicked node in global variable for access in other functions
+        clickedNode = d;
+        break;
+      }
+    }
+
     if (clickedNode) {
-      window.selectedNode = clickedNode;
+      selectedNode = clickedNode; // Update selected node for details panel
+      zoomToNode(clickedNode); // Zoom to the clicked node
 
-      // Transition to full clarity: Adjust depth if clicking a hidden object
-      const zoomDepth = currentZoomNode ? currentZoomNode.depth : 0;
-      const clickedRelDepth = clickedNode.depth - zoomDepth;
-      let depthToPass = null;
-      if (maxVisibleDepthRelative < 10 && clickedRelDepth > maxVisibleDepthRelative) {
-          depthToPass = Math.ceil(clickedRelDepth);
-      }
-
-      // Handle Multi-select with Ctrl
-      if (event.ctrlKey) {
-          if (selectedNodes.has(clickedNode)) {
-              selectedNodes.delete(clickedNode);
-              if (selectedNode === clickedNode) selectedNode = Array.from(selectedNodes).pop() || null;
-          } else {
-              selectedNodes.add(clickedNode);
-              selectedNode = clickedNode;
-          }
-      } else {
-          selectedNodes.clear();
-          selectedNodes.add(clickedNode);
-          selectedNode = clickedNode;
-          zoomToNode(clickedNode, depthToPass); // Pass the target depth here
-      }
-
-      if (selectedNode) selectedNodeDetails(selectedNode);
+      selectedNodeDetails(clickedNode); // Update details panel with selected node info
 
       //Breadcrumbs or full path needs updating
       drawVisualization(); // Redraw to remove selection highlight
@@ -3055,9 +2778,10 @@ function exportCanvasAsPNG() {
       }
     } else {
       // If click occurred outside any node, clear selection and zoom out
-        selectedNodes.clear();
-        selectedNode = null;
+      //if (selectedNode) {
+        selectedNode = currentDataNodes[0]; // Reset to root node
         drawVisualization(); // Redraw to remove selection highlight
+      //}
         selectedItemDetails.classList.add("hidden");
         detailPath.textContent = "";
       copyPathButton.classList.add("hidden");
@@ -3071,15 +2795,8 @@ function exportCanvasAsPNG() {
       window.selectedNodeInTree(node);
     }
     selectedNode = node;
-
-    if (selectedNodes.size > 1) {
-        detailName.textContent = `${selectedNodes.size} items selected`;
-        detailType.textContent = "Mixed Selection";
-        // Handle summary for multiple items if desired
-    } else {
-        detailName.textContent = selectedNode.data.name;
-        detailType.textContent = selectedNode.data.type || "Folder";
-    }
+    detailName.textContent = selectedNode.data.name;
+    detailType.textContent = selectedNode.data.type || "Folder";
     
     document.getElementById("searchResultSummary").classList.add("hidden");
     // Display details in the third column
@@ -3131,9 +2848,16 @@ function exportCanvasAsPNG() {
       detailLastModified.textContent = selectedNode.data.last_modified_iso
         ? new Date(selectedNode.data.last_modified_unix * 1000).toLocaleDateString()
         : "N/A";
-      
-      // The scanner already provides the full absolute path in the .path field
-      detailPath.textContent = selectedNode.data.path;
+      if (selectedNode.data.children) {
+        detailPath.textContent = node.data.path;
+      } else {
+        // Use path join for cross-platform reliability if pathApi is available
+        if (window.__TAURI_PLUGIN_PATH__) {
+            window.__TAURI_PLUGIN_PATH__.join(selectedNode.data.path, selectedNode.data.name).then(p => detailPath.textContent = p);
+        } else {
+            detailPath.textContent = selectedNode.data.path + (navigator.platform.includes("Win") ? "\\" : "/") + selectedNode.data.name;
+        }
+      }
   }
 
   // Function to format bytes into human-readable format
@@ -3196,10 +2920,11 @@ function exportCanvasAsPNG() {
                 `;
     document.body.appendChild(messageBox);
 
-    const closeBtn = messageBox.querySelector("#closeMessageBox");
-    closeBtn.addEventListener("click", function () {
-      messageBox.remove();
-    });
+    document
+      .getElementById("closeMessageBox")
+      .addEventListener("click", function () {
+        document.body.removeChild(messageBox);
+      });
   }
 
   function displaySettingsBox() {
@@ -3236,8 +2961,10 @@ function exportCanvasAsPNG() {
     for (let entry of entries) {
       if (entry.target === visualizationColumn) {
         const newWidth = entry.contentRect.width;
-        // Set new height relative to window height, capped by newWidth for square aspect
-        const newHeight = Math.min(newWidth, window.innerHeight - 160);
+        // Calculate available height based on window size and component position
+        const rect = visualizationColumn.getBoundingClientRect();
+        const availableHeight = window.innerHeight - rect.top - 60;
+        const newHeight = Math.max(300, Math.min(newWidth, availableHeight));
 
         if (canvas.width !== newWidth || canvas.height !== newHeight) {
           canvas.width = newWidth;

@@ -8,6 +8,40 @@
     "opener:default",
     "dialog:default",
     "shell:default",
-    "fs:default"
+    "fs:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "run-python-scanner",
+          "cmd": "python",
+          "args": ["src/scanner.py", "$0"]
+        },
+        {
+          "name": "binaries/scanner",
+          "sidecar": true,
+          "args": [
+            { "validator": "(.*)" }
+          ]
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "run-python-scanner",
+          "cmd": "python",
+          "args": ["src/scanner.py", "$0"]
+        },
+        {
+          "name": "binaries/scanner",
+          "sidecar": true,
+          "args": [
+            { "validator": "(.*)" }
+          ]
+        }
+      ]
+    }
   ]
 }
