@@ -108,14 +108,10 @@ if __name__ == "__main__":
         print(f"ERROR: {target_dir} not found", file=sys.stderr)
         sys.exit(1)
 
-    # 1. Start Marker
-    print("RESULT_START", flush=True)
-    
-    # 2. Run Scan with external preferences
+    # 1. Run Scan (Progress updates will print to stdout here)
     result = scan_folder(target_dir, args.depth, args.follow)
     
-    # 3. Dump JSON
+    # 2. Enclose the final JSON in clean markers
+    print("RESULT_START", flush=True)
     print(json.dumps(result), flush=True)
-    
-    # 4. End Marker
     print("RESULT_END", flush=True)
