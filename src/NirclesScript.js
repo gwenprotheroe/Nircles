@@ -32,6 +32,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const initialSearchPrompt = document.getElementById("initialSearchPrompt");
   
   const newScanButton = document.getElementById("newScanButton"); // Buttons! Button for everything!
+  const documentationButton = document.getElementById("documentationButton");
   const jsonFileLoad = document.getElementById("jsonFileLoad");
   const loadJsonFileButton = document.getElementById("loadJsonFileButton");
   const saveScanButton = document.getElementById("saveScanButton");
@@ -654,7 +655,7 @@ document.addEventListener("DOMContentLoaded", function () {
           
           // Respect the depth filter for selectability
           const relativeDepth = d.depth - zoomDepth;
-          if (maxVisibleDepthRelative < 10 && relativeDepth > Math.ceil(maxVisibleDepthRelative)) continue;
+          if (maxVisibleDepthRelative < 5 && relativeDepth > Math.ceil(maxVisibleDepthRelative)) continue;
 
           const dx = x - d.x;
           const dy = y - d.y;
@@ -748,34 +749,61 @@ document.addEventListener("DOMContentLoaded", function () {
       });
       if (!selectedFolder) return;
 
-      displayMessageBox(`Initiating scan for: ${selectedFolder}. This may take a moment...`, "Info");
+      const progressBox = displayMessageBox("Connecting to scanner...", "Scanning");
+      const statusText = progressBox.querySelector("#messageBoxText");
+      const closeBtn = progressBox.querySelector("#closeMessageBox");
+      if (closeBtn) closeBtn.style.display = "none"; // Hide OK button while scanning
 
       // 2. Prepare the sidecar command
       const command = window.__TAURI_PLUGIN_SHELL__.Command.sidecar('binaries/scanner', [selectedFolder]);
       
-      // 3. Use execute() to run the scan and wait for the final result
+      // 3. Listen to stdout for LIVE progress updates only
+      command.on('stdout', data => {
+          const chunk = data.toString();
+          if (chunk.includes("SCAN_PROGRESS:")) {
+              // Handle multiple progress lines in one chunk
+              const lines = chunk.split(/\r?\n/);
+              const lastProgress = lines.filter(l => l.includes("SCAN_PROGRESS:")).pop();
+              if (lastProgress) {
+                  statusText.textContent = lastProgress.replace("SCAN_PROGRESS:", "").trim();
+              }
+          }
+      });
+
+      command.on('error', error => {
+          progressBox.remove();
+          displayMessageBox("Scan failed: " + error, "Error");
+      });
+
       const result = await command.execute();
-      const output = result.stdout;
+      progressBox.remove(); // Clean up progress UI
 
-      const startMarker = "RESULT_START";
-      const endMarker = "RESULT_END";
-      const startIndex = output.indexOf(startMarker);
-      const endIndex = output.indexOf(endMarker);
-
-      if (startIndex === -1 || endIndex === -1) {
-        throw new Error("Invalid scanner output. Check Python dependencies.");
+      if (result.code !== 0) {
+          console.error("Scanner Exit Code:", result.code);
+          console.error("Scanner Error Details:", result.stderr);
+          displayMessageBox(`Scanner failed (Exit Code ${result.code}). Check the console for details.`, "Error");
+          return;
       }
 
-      const jsonString = output.substring(startIndex + startMarker.length, endIndex).trim();
+      // 4. Extract the JSON from the final complete output
+      const out = result.stdout;
+      const startIdx = out.lastIndexOf("RESULT_START");
+      const endIdx = out.lastIndexOf("RESULT_END");
+
+      if (startIdx === -1 || endIdx === -1) {
+          console.error("Full Scanner Output:", out);
+          throw new Error("No valid JSON result found in scanner output.");
+      }
+
+      const jsonString = out.substring(startIdx + "RESULT_START".length, endIdx).trim();
       const scannedData = JSON.parse(jsonString);
 
-      // 4. Update the view
+      // 5. Update the view
       window.immutableRawData = JSON.parse(JSON.stringify(scannedData));
       window.originalFullData = JSON.parse(JSON.stringify(scannedData));
       rootNodeData = scannedData;
-      processAndRenderVisualization(rootNodeData);
+      processAndRenderVisualization(rootNodeData, true); // Instant delivery
       updateBreadcrumbs();
-      displayMessageBox("Scan complete!", "Success");
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
@@ -812,6 +840,8 @@ document.addEventListener("DOMContentLoaded", function () {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   });
+
+  
 
   // Event listener for when a file is selected via the input
   jsonFileLoad.addEventListener("change", function (event) {
@@ -906,15 +936,38 @@ document.addEventListener("DOMContentLoaded", function () {
       });
   });
 
+  // Event listener for Documentation button
+  if (documentationButton) {
+    documentationButton.addEventListener("click", () => {
+      if (window.__TAURI_PLUGIN_SHELL__) {
+        window.__TAURI_PLUGIN_SHELL__.open("https://www.nircles.co.uk");
+      } else {
+        window.open("https://www.nircles.co.uk", "_blank");
+      }
+    });
+  }
+
   // Event listener for Close button
   closeAppButton.addEventListener("click", function () {
+    const performClose = async () => {
+      try {
+        if (window.__TAURI__ && window.__TAURI__.process) {
+          await window.__TAURI__.process.exit(0);
+        } else {
+          window.close();
+        }
+      } catch (e) {
+        window.close();
+      }
+    };
+
     if (hasUnsavedChanges) {
       displayConfirmationBox(
         "You have unsaved changes (filters/edits). Are you sure you want to close?",
-        () => { window.close(); }
+        performClose
       );
     } else {
-      window.close();
+      performClose();
     }
   });
 
@@ -1686,7 +1739,7 @@ folderFilterOutButton.addEventListener("click", function () {
   /////////////        Draw                       //////////////////
   //////////////////////////////////////////////////////////////////
   // Function to process data and then draw
-  function processAndRenderVisualization(data) {
+  function processAndRenderVisualization(data, immediate = false) {
         const containerWidth = visualizationColumn.offsetWidth;
     // Set canvas height relative to window height, capped by container width for square aspect
     const containerHeight = Math.min(containerWidth, window.innerHeight - 160);
@@ -1773,6 +1826,16 @@ folderFilterOutButton.addEventListener("click", function () {
       node.ty = node.y;
       node.tr = node.r;
     });
+
+    if (immediate) {
+        targetNodes.forEach(node => {
+            node.x = node.tx;
+            node.y = node.ty;
+            node.r = node.tr;
+        });
+        drawVisualization();
+        return;
+    }
 
     // Run the Animation Timer
     const duration = 1750; // milliseconds
@@ -3025,7 +3088,7 @@ function exportCanvasAsPNG() {
       const zoomDepth = currentZoomNode ? currentZoomNode.depth : 0;
       const clickedRelDepth = clickedNode.depth - zoomDepth;
       let depthToPass = null;
-      if (maxVisibleDepthRelative < 10 && clickedRelDepth > maxVisibleDepthRelative) {
+      if (maxVisibleDepthRelative < 5 && clickedRelDepth > maxVisibleDepthRelative) {
           depthToPass = Math.ceil(clickedRelDepth);
       }
 
@@ -3190,7 +3253,7 @@ function exportCanvasAsPNG() {
     messageBox.innerHTML = `
                     <div class="message-box-content">
                         <h3 class="${type === "Error" ? "text-error" : "text-info"}">${type}</h3>
-                        <p>${message}</p>
+                        <p id="messageBoxText">${message}</p>
                         <button id="closeMessageBox">OK</button>
                     </div>
                 `;
@@ -3200,6 +3263,7 @@ function exportCanvasAsPNG() {
     closeBtn.addEventListener("click", function () {
       messageBox.remove();
     });
+    return messageBox;
   }
 
   function displaySettingsBox() {
