@@ -1,9 +1,13 @@
+import io
 import os
 import json
 import sys
 import argparse
 from collections import deque
 from datetime import datetime
+
+# Ensure stdout uses UTF-8 to prevent encoding crashes on Windows
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 def canonical(path: str) -> str:
     try:
@@ -43,7 +47,9 @@ def scan_folder(root_path: str, max_depth: int, follow_links: bool):
     visited_canonicals = {root_canonical}
     queue = deque([(root_path, 0)])
     
-    folder_count = 0
+    item_count = 0
+
+    print(f"SCAN_PROGRESS: Starting scan of {os.path.basename(root_path)}...", flush=True)
 
     while queue:
         curr_path, depth = queue.popleft()
@@ -58,6 +64,7 @@ def scan_folder(root_path: str, max_depth: int, follow_links: bool):
                         
                         if entry_canonical in visited_canonicals: continue
                         
+                        item_count += 1
                         m_unix, m_iso = stat_times(entry_path)
                         
                         if entry.is_dir(follow_symlinks=follow_links):
@@ -75,10 +82,6 @@ def scan_folder(root_path: str, max_depth: int, follow_links: bool):
                             path_to_node[entry_path] = new_node
                             queue.append((entry_path, depth + 1))
                             
-                            # Progress pulse for Neutralino
-                            folder_count += 1
-                            if folder_count % 50 == 0:
-                                print(f"SCAN_PROGRESS: {folder_count} folders found...", flush=True)
                         else:
                             ext = os.path.splitext(entry.name)[1][1:].lower() or "file"
                             file_node = {
@@ -90,6 +93,10 @@ def scan_folder(root_path: str, max_depth: int, follow_links: bool):
                                 "last_modified_iso": m_iso
                             }
                             path_to_node[curr_path]["children"].append(file_node)
+
+                        if item_count % 100 == 0:
+                            print(f"SCAN_PROGRESS: Found {item_count} items...", flush=True)
+
                     except: continue
         except: continue
 
@@ -108,14 +115,10 @@ if __name__ == "__main__":
         print(f"ERROR: {target_dir} not found", file=sys.stderr)
         sys.exit(1)
 
-    # 1. Start Marker
-    print("RESULT_START", flush=True)
-    
-    # 2. Run Scan with external preferences
+    # 1. Run Scan (Progress updates will print to stdout here)
     result = scan_folder(target_dir, args.depth, args.follow)
     
-    # 3. Dump JSON
-    print(json.dumps(result), flush=True)
-    
-    # 4. End Marker
-    print("RESULT_END", flush=True)
+    # 2. Enclose the final JSON in clean markers
+    print("\nRESULT_START", flush=True)
+    print(json.dumps(result, ensure_ascii=False), flush=True)
+    print("\nRESULT_END", flush=True)
